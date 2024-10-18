@@ -1,31 +1,8 @@
 /home/jovyan/.conda/envs/aipbase/bin/python "/home/jovyan/jonglae/Retry1/1. Rotation/base_new30_new6_AD_Mobile.py"
 Using device: cuda
+/home/jovyan/jonglae/Retry1/1. Rotation/base_new30_new6_AD_Mobile.py:184: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(weight_path)
 /home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
   warnings.warn(
 /home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
   warnings.warn(msg)
-/home/jovyan/jonglae/Retry1/1. Rotation/base_new30_new6_AD_Mobile.py:182: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
-  state_dict = torch.load(weight_path)
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new30_new6_AD_Mobile.py", line 194, in <module>
-    mobilenet_model.load_state_dict(model_dict, strict=False)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2584, in load_state_dict
-    raise RuntimeError(
-RuntimeError: Error(s) in loading state_dict for MobileNetV2:
-        size mismatch for features.1.conv.1.weight: copying a param with shape torch.Size([32]) from checkpoint, the shape in current model is torch.Size([16, 32, 1, 1]).
-        size mismatch for features.2.conv.3.weight: copying a param with shape torch.Size([96, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([24]).
-        size mismatch for features.3.conv.3.weight: copying a param with shape torch.Size([144, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([24]).
-        size mismatch for features.4.conv.3.weight: copying a param with shape torch.Size([144, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.5.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.6.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.7.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.8.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.9.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.10.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.11.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.12.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.13.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.14.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.15.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.16.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.17.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([320]).
