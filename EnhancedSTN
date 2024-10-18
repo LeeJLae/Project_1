@@ -1,2 +1,209 @@
 import os
-impo
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import cv2
+import random
+from scipy import stats
+from timm.models.swin_transformer import swin_tiny_patch4_window7_224, swin_small_patch4_window7_224, swin_base_patch4_window7_224
+
+# 데이터 전처리 및 augmentation 함수
+def resize_and_pad(image, target_size=(224, 224)):  # target_size 변경
+    h, w = image.shape[:2]
+    scale = min(target_size[0] / h, target_size[1] / w)
+    new_w, new_h = int(w * scale), int(h * scale)
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    pad_w = (target_size[1] - new_w) // 2
+    pad_h = (target_size[0] - new_h) // 2
+    padded_image = cv2.copyMakeBorder(resized_image, pad_h, target_size[0] - new_h - pad_h,
+                                      pad_w, target_size[1] - new_w - pad_w,
+                                      cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    return padded_image
+
+def generate_unique_rotations(num_rotations, rotation_range=(-50, 50), min_angle_diff=0.3):
+    angles = []
+    while len(angles) < num_rotations:
+        angle = random.uniform(*rotation_range)
+        if all(abs(angle - a) >= min_angle_diff for a in angles):
+            angles.append(angle)
+    return angles
+
+def rotate_image(image, angle):
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    avg_pixel_value = int(np.mean(image))
+
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, M, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=avg_pixel_value)
+    
+    return rotated
+
+def adjust_brightness(image, factor):
+    return cv2.convertScaleAbs(image, alpha=factor, beta=0)
+
+def random_crop(image, crop_size=(100, 100)):
+    h, w = image.shape[:2]
+    crop_h, crop_w = crop_size
+    if h > crop_h and w > crop_w:
+        top = random.randint(0, h - crop_h)
+        left = random.randint(0, w - crop_w)
+        return image[top:top + crop_h, left:left + crop_w]
+    else:
+        return image
+
+# 데이터셋 클래스
+class RotNetDataset(Dataset):
+    def __init__(self, folder_path, num_augmentations=30, rotation_range=(-50, 50), crop_size=(100, 100), brightness_range=(0.5, 1.5)):
+        self.images = self.load_images(folder_path)
+        self.num_augmentations = num_augmentations
+        self.rotation_range = rotation_range
+        self.crop_size = crop_size
+        self.brightness_range = brightness_range
+        self.augmented_data = self.augment_images()
+
+    def load_images(self, folder_path):
+        images = []
+        for filename in os.listdir(folder_path):
+            if filename.endswith(('.png', '.jpg', '.jpeg', '.JPG')):
+                image = cv2.imread(os.path.join(folder_path, filename), cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)
+                images.append(image)
+        return images
+
+    def augment_images(self):
+        augmented_images = []
+        for image in self.images:
+            angles = generate_unique_rotations(self.num_augmentations, self.rotation_range, min_angle_diff=0.3)
+            for angle in angles:
+                rotated_image = rotate_image(image, angle)
+                brightness_factor = random.uniform(*self.brightness_range)
+                bright_image = adjust_brightness(rotated_image, brightness_factor)
+                cropped_image = random_crop(bright_image, self.crop_size)
+                augmented_images.append((cropped_image, angle))
+        return augmented_images
+
+    def __len__(self):
+        return len(self.augmented_data)
+
+    def __getitem__(self, idx):
+        image, angle = self.augmented_data[idx]
+        image = torch.tensor(image, dtype=torch.float32).unsqueeze(0) / 255.0  # 1채널
+        angle = torch.tensor(angle, dtype=torch.float32)
+        return image, angle
+
+# Swin Tiny/Small/Base 네트워크와 RotNet 결합
+class EnhancedRotNetWithSwin(nn.Module):
+    def __init__(self, swin_model):
+        super(EnhancedRotNetWithSwin, self).__init__()
+        self.swin = swin_model
+        
+        # 입력 채널 변경 (1채널 -> 3채널로 매핑)
+        self.swin.patch_embed.proj = nn.Conv2d(1, self.swin.patch_embed.proj.out_channels, kernel_size=4, stride=4, padding=0, bias=False)
+
+        self.fc1 = nn.Linear(768, 128)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 64)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(64, 1)
+
+    def forward(self, x):
+        x = self.swin(x)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout1(x)
+        x = torch.relu(self.fc2(x))
+        x = self.dropout2(x)
+        x = self.fc3(x)
+        return x
+
+# 모델 학습 함수 정의
+def train_model(model, train_loader, num_epochs=40, tolerance=1.0):
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        correct_predictions = 0
+        total_predictions = 0
+
+        for images, angles in train_loader:
+            images, angles = images.to(device), angles.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(images).squeeze()
+            loss = criterion(outputs, angles)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            diff = torch.abs(outputs - angles)
+            correct_predictions += torch.sum(diff <= tolerance).item()
+            total_predictions += len(angles)
+
+        accuracy = (correct_predictions / total_predictions) * 100
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / len(train_loader):.4f}, Accuracy: {accuracy:.2f}%")
+
+    torch.save(model.state_dict(), '/home/jovyan/Rotation_Swin_base_e40_a30.pth')
+    print("모델이 저장되었습니다.")
+
+# Test 및 이미지 저장 함수 정의
+def test_and_save_images(model, test_folder, save_path='test_corrected_images_swin_base_e40_a30'):
+    os.makedirs(save_path, exist_ok=True)
+
+    model.eval()
+    with torch.no_grad():
+        for filename in os.listdir(test_folder):
+            if filename.endswith(('.png', '.jpg', '.jpeg', '.JPG')):
+                image_path = os.path.join(test_folder, filename)
+                image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)
+                image_tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 255.0
+
+                image_tensor = image_tensor.to(device)
+
+                predicted_angle = model(image_tensor).item()
+
+                corrected_image = rotate_image(image, -predicted_angle)
+                save_filename = os.path.join(save_path, f"{filename.split('.')[0]}_corrected.png")
+                cv2.imwrite(save_filename, corrected_image)
+                print(f"{filename} - Predicted Angle: {predicted_angle:.2f}")
+
+# 데이터셋 및 모델 초기화
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+
+# Swin 모델 선택 (Tiny, Small, Base 중 하나 선택)
+swin_model = swin_base_patch4_window7_224(pretrained=False)
+
+# Pretrained 모델 불러오기
+weight_path = "/home/jovyan/RoPreTrain/swin_base_patch4_window7_224_22k.pth"  # Base 모델 가중치
+state_dict = torch.load(weight_path, map_location="cpu")
+
+# 키 수정
+pretrained_dict = {k.replace("model.", ""): v for k, v in state_dict.items() if k in swin_model.state_dict()}
+model_dict = swin_model.state_dict()
+model_dict.update(pretrained_dict)
+
+# 모델에 로드
+swin_model.load_state_dict(model_dict, strict=False)
+print("Pretrained weights loaded successfully.")
+
+# RotNet 모델 정의
+model = EnhancedRotNetWithSwin(swin_model).to(device)
+
+train_folder = '/home/jovyan/gen_new_train_images'
+test_folder = '/home/jovyan/test_image'
+
+# 데이터셋 및 DataLoader 생성
+train_dataset = RotNetDataset(train_folder)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+# 모델 학습
+train_model(model, train_loader)
+
+# 테스트 및 결과 이미지 저장
+test_and_save_images(model, test_folder)
