@@ -1,42 +1,32 @@
-/home/jovyan/.conda/envs/aipbase/bin/python "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin-Tiny.py"
+ /home/jovyan/.conda/envs/aipbase/bin/python "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin.py"
 Using device: cuda
-/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin-Tiny.py:19: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin.py:20: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
   state_dict = torch.load(weight_path, map_location="cpu")
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin-Tiny.py", line 183, in <module>
+  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin.py", line 173, in <module>
     train_model(model, train_loader)
-  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin-Tiny.py", line 117, in train_model
+  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin.py", line 116, in train_model
     outputs = model(images).squeeze()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
     return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
     return forward_call(*args, **kwargs)
-  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin-Tiny.py", line 31, in forward
+  File "/home/jovyan/jonglae/Retry1/1. Rotation/base_new21_new6_AD_Swin.py", line 28, in forward
     x = self.swin(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
     return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
     return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/swin_transformer.py", line 608, in forward
-    x = self.features(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/timm/models/swin_transformer.py", line 838, in forward
+    x = self.forward_features(x)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/timm/models/swin_transformer.py", line 829, in forward_features
+    x = self.patch_embed(x)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
     return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
     return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/container.py", line 219, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/container.py", line 219, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1553, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1562, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 458, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 454, in _conv_forward
-    return F.conv2d(input, weight, bias, self.stride,
-RuntimeError: Given groups=1, weight of size [96, 3, 4, 4], expected input[32, 1, 128, 128] to have 3 channels, but got 1 channels instead
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/timm/layers/patch_embed.py", line 116, in forward
+    _assert(H == self.img_size[0], f"Input height ({H}) doesn't match model ({self.img_size[0]}).")
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/__init__.py", line 2041, in _assert
+    assert condition, message
+AssertionError: Input height (128) doesn't match model (224).
