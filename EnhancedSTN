@@ -1,109 +1,23 @@
-import cv2
-import numpy as np
-import os
-from ultralytics import YOLO
-import albumentations as A
-import random
-import torch
-import warnings
+Traceback (most recent call last):
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 559, in get_dataset
+    data = check_det_dataset(self.args.data)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/utils.py", line 328, in check_det_dataset
+    raise FileNotFoundError(m)
+FileNotFoundError: 
+Dataset '/home/jovyan/Y_T_Data/Y_T_Dataset_NEW.yaml' images not found ⚠️, missing path '/home/jovyan/Y_T_Data/val/image'
+Note dataset download directory is '/home/jovyan/datasets'. You can update this in '/home/jovyan/.config/Ultralytics/settings.json'
 
-warnings.filterwarnings("ignore", category=UserWarning, module='albumentations')
-# YOLO 모델 로드
-model = YOLO('/home/jovyan/yolo11pre/yolo11m.pt')
+The above exception was the direct cause of the following exception:
 
-# 원본 이미지와 라벨 폴더 경로
-train_image_dir = '/home/jovyan/Y_T_Image'
-train_label_dir = '/home/jovyan/Y_T_Txt'
-
-# 자동으로 증강된 이미지를 저장할 폴더 생성
-augmented_image_dir = os.path.join(train_image_dir, 'augmented_images')
-augmented_label_dir = os.path.join(train_label_dir, 'augmented_labels')
-
-os.makedirs(augmented_image_dir, exist_ok=True)
-os.makedirs(augmented_label_dir, exist_ok=True)
-
-test_image_dir = '/home/jovyan/test_image'
-test_results_dir = '/home/jovyan/Y_T_Results'
-os.makedirs(test_results_dir, exist_ok=True)
-
-# 데이터 증강 및 회전 적용 함수 (1도씩 적용)
-def augment_image_and_label(image_path, label_path):
-    image = cv2.imread(image_path)
-    label_file = open(label_path, 'r')
-    labels = label_file.readlines()
-    label_file.close()
-
-    for angle in range(-180, 181):  # -180 ~ 180도까지 1도씩 회전
-        # 데이터 증강 설정 (각도별 회전)
-        transform = A.Compose([
-            A.Rotate(limit=(angle, angle), border_mode=cv2.BORDER_CONSTANT, p=1.0),  # 각도를 고정해서 회전
-            A.RandomBrightnessContrast(p=0.5),  # 밝기 및 대비 조정
-        ])
-
-        # 이미지 증강
-        augmented = transform(image=image)
-        augmented_image = augmented['image']
-
-        # 증강된 이미지 및 라벨 파일 저장
-        filename = os.path.basename(image_path).replace('.jpg', f'_rot{angle}.jpg')
-        augmented_image_path = os.path.join(augmented_image_dir, filename)
-        augmented_label_path = os.path.join(augmented_label_dir, filename.replace('.jpg', '.txt'))
-
-        cv2.imwrite(augmented_image_path, augmented_image)
-        with open(augmented_label_path, 'w') as f:
-            for label in labels:
-                class_id, x_center, y_center, width, height = map(float, label.strip().split())
-                # 각도에 따라 바운딩 박스 좌표를 회전 변환할 필요가 있음
-                f.write(f"{class_id} {x_center} {y_center} {width} {height}\n")
-
-# 학습 데이터에 대해 모든 각도(-180 ~ 180) 증강 적용
-for image_file in os.listdir(train_image_dir):
-    if image_file.endswith('.jpg'):
-        image_path = os.path.join(train_image_dir, image_file)
-        label_path = os.path.join(train_label_dir, image_file.replace('.jpg', '.txt'))
-        augment_image_and_label(image_path, label_path)
-
-# YOLO 모델 파인튜닝
-train_data = '/home/jovyan/Y_T_Dataset.yaml'
-
-model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, optimizer='SGD')
-
-# 학습 후 모델 파라미터 저장
-model.save('/path/to/save/fine_tuned_yolo_v11m.pt')
-
-# 테스트 결과 저장 함수 (이미지 입력만으로 물체 감지)
-def save_test_results(image_path, results):
-    # 결과 이미지 저장
-    result_image = results.imgs[0]
-    filename = os.path.basename(image_path).replace('.JPG', '_result.png')
-    result_image_path = os.path.join(test_results_dir, filename)
-    cv2.imwrite(result_image_path, result_image)
-    
-    # 결과 텍스트 저장
-    txt_filename = os.path.basename(image_path).replace('.JPG', '_result.txt')
-    result_txt_path = os.path.join(test_results_dir, txt_filename)
-    with open(result_txt_path, 'w') as f:
-        # 예측된 물체의 개수와 좌표값을 저장
-        f.write(f"Detected Objects:\n")
-        for i, result in enumerate(results):
-            boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-            f.write(f"Object {i + 1}:\n")
-            for box in boxes:
-                x1, y1, x2, y2 = box[:4].astype(int)
-                f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
-    print(f"Results saved to {result_txt_path} and {result_image_path}")
-
-# 테스트 진행 (이미지만 입력)
-def test_model():
-    for image_file in os.listdir(test_image_dir):
-        if image_file.endswith('.JPG'):
-            image_path = os.path.join(test_image_dir, image_file)
-
-            # 테스트 수행 (이미지만 입력)
-            results = model(image_path)
-
-            # 결과 저장
-            save_test_results(image_path, results)
-
-# 모델 테스트 실행
-test_model()
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/2. B-BOX/base_yolo_renew.py", line 89, in <module>
+    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, optimizer='SGD')
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 796, in train
+    self.trainer = (trainer or self._smart_load("trainer"))(overrides=args, _callbacks=self.callbacks)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 133, in __init__
+    self.trainset, self.testset = self.get_dataset()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 563, in get_dataset
+    raise RuntimeError(emojis(f"Dataset '{clean_url(self.args.data)}' error ❌ {e}")) from e
+RuntimeError: Dataset '/home/jovyan/Y_T_Data/Y_T_Dataset_NEW.yaml' error ❌ 
+Dataset '/home/jovyan/Y_T_Data/Y_T_Dataset_NEW.yaml' images not found ⚠️, missing path '/home/jovyan/Y_T_Data/val/image'
+Note dataset download directory is '/home/jovyan/datasets'. You can update this in '/home/jovyan/.config/Ultralytics/settings.json'
