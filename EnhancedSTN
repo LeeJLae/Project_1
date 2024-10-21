@@ -1,6 +1,6 @@
 Traceback (most recent call last):
   File "/home/jovyan/jonglae/Retry1/2. B-BOX/base_yolo_detection.py", line 16, in <module>
-    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False)
+    model.train(data=train_data, epochs=50, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20)
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 802, in train
     self.trainer.train()
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 207, in train
