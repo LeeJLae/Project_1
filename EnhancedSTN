@@ -1,225 +1,109 @@
-train: Scanning /home/jovyan/Y_T_Data/train/labels.cache... 25092 images, 0 backgrounds, 201 corrupt: 100%|██████████| 25092/25092 [00:00<?, ?it/s]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-138.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [      1.001]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-139.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0008      1.0031]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-140.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0029      1.0051]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-141.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0048       1.007]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-142.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0066      1.0087]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-143.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0082      1.0102]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-144.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0096      1.0116]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-145.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0109      1.0129]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-146.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0121      1.0139]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-147.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0131      1.0149]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-148.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0139      1.0156]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-149.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0146      1.0162]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-150.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0151      1.0167]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-151.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0155       1.017]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-152.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0157      1.0171]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-153.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0157      1.0171]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-154.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0156      1.0169]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-155.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0153      1.0166]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-156.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0149      1.0161]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-157.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0143      1.0154]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-158.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0136      1.0146]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-159.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0127      1.0136]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-160.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0117      1.0125]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-161.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0105      1.0112]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-162.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0091      1.0098]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-163.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0076      1.0082]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-164.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0059      1.0065]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-165.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0041      1.0046]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-166.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0021      1.0025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-167.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0003]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-48.jpg: ignoring corrupt image/label: negative label values [-0.00097997]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-49.jpg: ignoring corrupt image/label: negative label values [ -0.0008189  -0.0031411]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-50.jpg: ignoring corrupt image/label: negative label values [ -0.0028908  -0.0051489]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-51.jpg: ignoring corrupt image/label: negative label values [ -0.0048095  -0.0070029]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-52.jpg: ignoring corrupt image/label: negative label values [ -0.0065744  -0.0087025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-53.jpg: ignoring corrupt image/label: negative label values [  -0.008185   -0.010247]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-54.jpg: ignoring corrupt image/label: negative label values [ -0.0096408   -0.011636]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-55.jpg: ignoring corrupt image/label: negative label values [  -0.010941    -0.01287]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-56.jpg: ignoring corrupt image/label: negative label values [  -0.012086   -0.013947]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-57.jpg: ignoring corrupt image/label: negative label values [  -0.013075   -0.014867]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-58.jpg: ignoring corrupt image/label: negative label values [  -0.013908   -0.015631]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-59.jpg: ignoring corrupt image/label: negative label values [  -0.014584   -0.016237]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-60.jpg: ignoring corrupt image/label: negative label values [  -0.015104   -0.016687]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-61.jpg: ignoring corrupt image/label: negative label values [  -0.015466   -0.016979]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-62.jpg: ignoring corrupt image/label: negative label values [  -0.015671   -0.017113]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-63.jpg: ignoring corrupt image/label: negative label values [   -0.01572    -0.01709]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-64.jpg: ignoring corrupt image/label: negative label values [  -0.015611    -0.01691]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-65.jpg: ignoring corrupt image/label: negative label values [  -0.015345   -0.016572]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-66.jpg: ignoring corrupt image/label: negative label values [  -0.014923   -0.016077]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-67.jpg: ignoring corrupt image/label: negative label values [  -0.014343   -0.015424]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-68.jpg: ignoring corrupt image/label: negative label values [  -0.013607   -0.014615]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-69.jpg: ignoring corrupt image/label: negative label values [  -0.012714   -0.013648]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-70.jpg: ignoring corrupt image/label: negative label values [  -0.011665   -0.012526]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-71.jpg: ignoring corrupt image/label: negative label values [   -0.01046   -0.011247]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-72.jpg: ignoring corrupt image/label: negative label values [ -0.0091001  -0.0098121]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-73.jpg: ignoring corrupt image/label: negative label values [ -0.0075847  -0.0082222]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-74.jpg: ignoring corrupt image/label: negative label values [ -0.0059148  -0.0064775]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-75.jpg: ignoring corrupt image/label: negative label values [ -0.0040907  -0.0045785]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-76.jpg: ignoring corrupt image/label: negative label values [ -0.0021131  -0.0025259]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot-77.jpg: ignoring corrupt image/label: negative label values [-0.00032012]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot103.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0003]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot104.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0021      1.0025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot105.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0041      1.0046]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot106.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0059      1.0065]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot107.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0076      1.0082]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot108.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0091      1.0098]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot109.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0105      1.0112]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot110.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0117      1.0125]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot111.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0127      1.0136]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot112.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0136      1.0146]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot113.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0143      1.0154]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot114.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0149      1.0161]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot117.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0157      1.0171]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot118.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0157      1.0171]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot119.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0155       1.017]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot120.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0151      1.0167]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot121.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0146      1.0162]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot122.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0139      1.0156]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot123.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0131      1.0149]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot124.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0121      1.0139]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot125.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0109      1.0129]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot126.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0096      1.0116]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot127.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0082      1.0102]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot128.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0066      1.0087]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot129.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0048       1.007]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot13.jpg: ignoring corrupt image/label: negative label values [-0.00032012]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot130.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0029      1.0051]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot131.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0008      1.0031]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot132.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [      1.001]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot14.jpg: ignoring corrupt image/label: negative label values [ -0.0021131  -0.0025259]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot15.jpg: ignoring corrupt image/label: negative label values [ -0.0040907  -0.0045785]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot16.jpg: ignoring corrupt image/label: negative label values [ -0.0059148  -0.0064775]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot17.jpg: ignoring corrupt image/label: negative label values [ -0.0075847  -0.0082222]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot18.jpg: ignoring corrupt image/label: negative label values [ -0.0091001  -0.0098121]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot19.jpg: ignoring corrupt image/label: negative label values [   -0.01046   -0.011247]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot20.jpg: ignoring corrupt image/label: negative label values [  -0.011665   -0.012526]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot21.jpg: ignoring corrupt image/label: negative label values [  -0.012714   -0.013648]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot22.jpg: ignoring corrupt image/label: negative label values [  -0.013607   -0.014615]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot23.jpg: ignoring corrupt image/label: negative label values [  -0.014343   -0.015424]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot25.jpg: ignoring corrupt image/label: negative label values [  -0.015345   -0.016572]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot26.jpg: ignoring corrupt image/label: negative label values [  -0.015611    -0.01691]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot28.jpg: ignoring corrupt image/label: negative label values [  -0.015671   -0.017113]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot29.jpg: ignoring corrupt image/label: negative label values [  -0.015466   -0.016979]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot30.jpg: ignoring corrupt image/label: negative label values [  -0.015104   -0.016687]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot31.jpg: ignoring corrupt image/label: negative label values [  -0.014584   -0.016237]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot32.jpg: ignoring corrupt image/label: negative label values [  -0.013908   -0.015631]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot33.jpg: ignoring corrupt image/label: negative label values [  -0.013075   -0.014867]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot34.jpg: ignoring corrupt image/label: negative label values [  -0.012086   -0.013947]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot35.jpg: ignoring corrupt image/label: negative label values [  -0.010941    -0.01287]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot36.jpg: ignoring corrupt image/label: negative label values [ -0.0096408   -0.011636]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot37.jpg: ignoring corrupt image/label: negative label values [  -0.008185   -0.010247]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot38.jpg: ignoring corrupt image/label: negative label values [ -0.0065744  -0.0087025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot39.jpg: ignoring corrupt image/label: negative label values [ -0.0048095  -0.0070029]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot40.jpg: ignoring corrupt image/label: negative label values [ -0.0028908  -0.0051489]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot41.jpg: ignoring corrupt image/label: negative label values [ -0.0008189  -0.0031411]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/70_rot42.jpg: ignoring corrupt image/label: negative label values [-0.00097997]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-141.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0009]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-142.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0013      1.0025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-143.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0028      1.0039]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-144.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0041      1.0051]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-145.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0052      1.0061]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-146.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0061      1.0071]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-147.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [      1.007      1.0078]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-148.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0076      1.0084]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-149.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0081      1.0089]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-150.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0085      1.0092]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-151.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0087      1.0093]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-152.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0087      1.0093]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-154.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0083      1.0088]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-155.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0079      1.0083]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-156.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0073      1.0077]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-157.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0066      1.0069]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-158.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0057      1.0059]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-159.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0047      1.0048]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-160.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0035      1.0036]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-161.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0022      1.0022]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-162.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0007      1.0006]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-51.jpg: ignoring corrupt image/label: negative label values [-0.00094885]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-52.jpg: ignoring corrupt image/label: negative label values [ -0.0013447  -0.0024773]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-53.jpg: ignoring corrupt image/label: negative label values [ -0.0027758  -0.0038527]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-54.jpg: ignoring corrupt image/label: negative label values [ -0.0040539  -0.0050747]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-55.jpg: ignoring corrupt image/label: negative label values [ -0.0051784  -0.0061427]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-56.jpg: ignoring corrupt image/label: negative label values [  -0.006149  -0.0070566]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-57.jpg: ignoring corrupt image/label: negative label values [ -0.0069654  -0.0078161]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-58.jpg: ignoring corrupt image/label: negative label values [ -0.0076274  -0.0084209]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-59.jpg: ignoring corrupt image/label: negative label values [ -0.0081348  -0.0088708]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-60.jpg: ignoring corrupt image/label: negative label values [ -0.0084874  -0.0091656]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-61.jpg: ignoring corrupt image/label: negative label values [ -0.0086851  -0.0093054]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-62.jpg: ignoring corrupt image/label: negative label values [ -0.0087279  -0.0092901]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-63.jpg: ignoring corrupt image/label: negative label values [ -0.0086157  -0.0091196]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-64.jpg: ignoring corrupt image/label: negative label values [ -0.0083486   -0.008794]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-65.jpg: ignoring corrupt image/label: negative label values [ -0.0079266  -0.0083135]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-66.jpg: ignoring corrupt image/label: negative label values [ -0.0073499  -0.0076781]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-67.jpg: ignoring corrupt image/label: negative label values [ -0.0066186  -0.0068881]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-68.jpg: ignoring corrupt image/label: negative label values [ -0.0057331  -0.0059436]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-69.jpg: ignoring corrupt image/label: negative label values [ -0.0046934  -0.0048451]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-70.jpg: ignoring corrupt image/label: negative label values [ -0.0035001  -0.0035928]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot-71.jpg: ignoring corrupt image/label: negative label values [ -0.0021534   -0.002187]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot108.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0007      1.0006]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot110.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0035      1.0036]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot111.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0047      1.0048]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot112.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0057      1.0059]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot113.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0066      1.0069]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot114.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0073      1.0077]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot115.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0079      1.0083]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot116.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0083      1.0088]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot117.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0086      1.0091]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot118.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0087      1.0093]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot119.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0087      1.0093]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot120.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0085      1.0092]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot121.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0081      1.0089]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot122.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0076      1.0084]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot123.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [      1.007      1.0078]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot124.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0061      1.0071]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot125.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0052      1.0061]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot126.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0041      1.0051]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot127.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0028      1.0039]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot128.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0013      1.0025]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot129.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0009]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot18.jpg: ignoring corrupt image/label: negative label values [-0.00065368 -0.00062832]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot19.jpg: ignoring corrupt image/label: negative label values [ -0.0021534   -0.002187]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot20.jpg: ignoring corrupt image/label: negative label values [ -0.0035001  -0.0035928]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot21.jpg: ignoring corrupt image/label: negative label values [ -0.0046934  -0.0048451]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot22.jpg: ignoring corrupt image/label: negative label values [ -0.0057331  -0.0059436]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot23.jpg: ignoring corrupt image/label: negative label values [ -0.0066186  -0.0068881]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot24.jpg: ignoring corrupt image/label: negative label values [ -0.0073499  -0.0076781]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot25.jpg: ignoring corrupt image/label: negative label values [ -0.0079266  -0.0083135]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot26.jpg: ignoring corrupt image/label: negative label values [ -0.0083486   -0.008794]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot27.jpg: ignoring corrupt image/label: negative label values [ -0.0086157  -0.0091196]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot28.jpg: ignoring corrupt image/label: negative label values [ -0.0087279  -0.0092901]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot29.jpg: ignoring corrupt image/label: negative label values [ -0.0086851  -0.0093054]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot30.jpg: ignoring corrupt image/label: negative label values [ -0.0084874  -0.0091656]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot31.jpg: ignoring corrupt image/label: negative label values [ -0.0081348  -0.0088708]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot32.jpg: ignoring corrupt image/label: negative label values [ -0.0076274  -0.0084209]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot33.jpg: ignoring corrupt image/label: negative label values [ -0.0069654  -0.0078161]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot34.jpg: ignoring corrupt image/label: negative label values [  -0.006149  -0.0070566]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot35.jpg: ignoring corrupt image/label: negative label values [ -0.0051784  -0.0061427]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot36.jpg: ignoring corrupt image/label: negative label values [ -0.0040539  -0.0050747]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot37.jpg: ignoring corrupt image/label: negative label values [ -0.0027758  -0.0038527]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot38.jpg: ignoring corrupt image/label: negative label values [ -0.0013447  -0.0024773]
-train: WARNING ⚠️ /home/jovyan/Y_T_Data/train/images/72_rot39.jpg: ignoring corrupt image/label: negative label values [-0.00094885]
-/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/albumentations/check_version.py:49: UserWarning: Error fetching version info <urlopen error _ssl.c:990: The handshake operation timed out>
-  data = fetch_version_info()
-albumentations: Blur(p=0.01, blur_limit=(3, 7)), MedianBlur(p=0.01, blur_limit=(3, 7)), ToGray(p=0.01, num_output_channels=3, method='weighted_average'), CLAHE(p=0.01, clip_limit=(1, 4.0), tile_grid_size=(8, 8))
-val: Scanning /home/jovyan/Y_T_Data/val/labels... 900 images, 0 backgrounds, 7 corrupt: 100%|██████████| 900/900 [00:01<00:00, 812.83it/s]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/70_rot115.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0153      1.0166]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/70_rot116.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0156      1.0169]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/70_rot24.jpg: ignoring corrupt image/label: negative label values [  -0.014923   -0.016077]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/70_rot27.jpg: ignoring corrupt image/label: negative label values [   -0.01572    -0.01709]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/72_rot-153.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0086      1.0091]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/72_rot-72.jpg: ignoring corrupt image/label: negative label values [-0.00065368 -0.00062832]
-val: WARNING ⚠️ /home/jovyan/Y_T_Data/val/images/72_rot109.jpg: ignoring corrupt image/label: non-normalized or out of bounds coordinates [     1.0022      1.0022]
-val: New cache created: /home/jovyan/Y_T_Data/val/labels.cache
-Plotting labels to runs/detect/train20/labels.jpg... 
-optimizer: 'optimizer=auto' found, ignoring 'lr0=0.001' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
-optimizer: AdamW(lr=0.001, momentum=0.9) with parameter groups 106 weight(decay=0.0), 113 weight(decay=0.0005), 112 bias(decay=0.0)
-TensorBoard: model graph visualization added ✅
-Image sizes 640 train, 640 val
-Using 8 dataloader workers
-Logging results to runs/detect/train20
-Starting training for 1 epochs...
+import cv2
+import numpy as np
+import os
+from ultralytics import YOLO
+import albumentations as A
+import random
+import torch
+import warnings
 
-      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
-        1/1      18.5G      1.937      1.683      1.596        330        640:  51%|█████     | 794/1556 [06:54<06:33,  1.94it/s]
+warnings.filterwarnings("ignore", category=UserWarning, module='albumentations')
+# YOLO 모델 로드
+model = YOLO('/home/jovyan/yolo11pre/yolo11m.pt')
+
+# 원본 이미지와 라벨 폴더 경로
+train_image_dir = '/home/jovyan/Y_T_Image'
+train_label_dir = '/home/jovyan/Y_T_Txt'
+
+# 자동으로 증강된 이미지를 저장할 폴더 생성
+augmented_image_dir = os.path.join(train_image_dir, 'augmented_images')
+augmented_label_dir = os.path.join(train_label_dir, 'augmented_labels')
+
+os.makedirs(augmented_image_dir, exist_ok=True)
+os.makedirs(augmented_label_dir, exist_ok=True)
+
+test_image_dir = '/home/jovyan/test_image'
+test_results_dir = '/home/jovyan/Y_T_Results'
+os.makedirs(test_results_dir, exist_ok=True)
+
+# 데이터 증강 및 회전 적용 함수 (1도씩 적용)
+def augment_image_and_label(image_path, label_path):
+    image = cv2.imread(image_path)
+    label_file = open(label_path, 'r')
+    labels = label_file.readlines()
+    label_file.close()
+
+    for angle in range(-180, 181):  # -180 ~ 180도까지 1도씩 회전
+        # 데이터 증강 설정 (각도별 회전)
+        transform = A.Compose([
+            A.Rotate(limit=(angle, angle), border_mode=cv2.BORDER_CONSTANT, p=1.0),  # 각도를 고정해서 회전
+            A.RandomBrightnessContrast(p=0.5),  # 밝기 및 대비 조정
+        ])
+
+        # 이미지 증강
+        augmented = transform(image=image)
+        augmented_image = augmented['image']
+
+        # 증강된 이미지 및 라벨 파일 저장
+        filename = os.path.basename(image_path).replace('.jpg', f'_rot{angle}.jpg')
+        augmented_image_path = os.path.join(augmented_image_dir, filename)
+        augmented_label_path = os.path.join(augmented_label_dir, filename.replace('.jpg', '.txt'))
+
+        cv2.imwrite(augmented_image_path, augmented_image)
+        with open(augmented_label_path, 'w') as f:
+            for label in labels:
+                class_id, x_center, y_center, width, height = map(float, label.strip().split())
+                # 각도에 따라 바운딩 박스 좌표를 회전 변환할 필요가 있음
+                f.write(f"{class_id} {x_center} {y_center} {width} {height}\n")
+
+# 학습 데이터에 대해 모든 각도(-180 ~ 180) 증강 적용
+for image_file in os.listdir(train_image_dir):
+    if image_file.endswith('.jpg'):
+        image_path = os.path.join(train_image_dir, image_file)
+        label_path = os.path.join(train_label_dir, image_file.replace('.jpg', '.txt'))
+        augment_image_and_label(image_path, label_path)
+
+# YOLO 모델 파인튜닝
+train_data = '/home/jovyan/Y_T_Dataset.yaml'
+
+model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, optimizer='SGD')
+
+# 학습 후 모델 파라미터 저장
+model.save('/path/to/save/fine_tuned_yolo_v11m.pt')
+
+# 테스트 결과 저장 함수 (이미지 입력만으로 물체 감지)
+def save_test_results(image_path, results):
+    # 결과 이미지 저장
+    result_image = results.imgs[0]
+    filename = os.path.basename(image_path).replace('.JPG', '_result.png')
+    result_image_path = os.path.join(test_results_dir, filename)
+    cv2.imwrite(result_image_path, result_image)
+    
+    # 결과 텍스트 저장
+    txt_filename = os.path.basename(image_path).replace('.JPG', '_result.txt')
+    result_txt_path = os.path.join(test_results_dir, txt_filename)
+    with open(result_txt_path, 'w') as f:
+        # 예측된 물체의 개수와 좌표값을 저장
+        f.write(f"Detected Objects:\n")
+        for i, result in enumerate(results):
+            boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+            f.write(f"Object {i + 1}:\n")
+            for box in boxes:
+                x1, y1, x2, y2 = box[:4].astype(int)
+                f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+    print(f"Results saved to {result_txt_path} and {result_image_path}")
+
+# 테스트 진행 (이미지만 입력)
+def test_model():
+    for image_file in os.listdir(test_image_dir):
+        if image_file.endswith('.JPG'):
+            image_path = os.path.join(test_image_dir, image_file)
+
+            # 테스트 수행 (이미지만 입력)
+            results = model(image_path)
+
+            # 결과 저장
+            save_test_results(image_path, results)
+
+# 모델 테스트 실행
+test_model()
