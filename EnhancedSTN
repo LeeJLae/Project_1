@@ -1,58 +1,57 @@
-/home/jovyan/.conda/envs/aipbase/bin/python "/home/jovyan/jonglae/Retry1/2. B-BOX/base_yolo_detection.py"
-Ultralytics 8.3.6 🚀 Python-3.10.14 torch-2.5.0+cu124 CUDA:0 (NVIDIA A100 80GB PCIe MIG 2g.20gb, 19968MiB)
-engine/trainer: task=detect, mode=train, model=/home/jovyan/yolo11pre/yolo11m.pt, data=/home/jovyan/Y_T_Data/Y_T_Dataset.yaml, epochs=1, time=None, patience=100, batch=16, imgsz=640, save=True, save_period=-1, cache=False, device=cuda, workers=8, project=None, name=train9, exist_ok=False, pretrained=True, optimizer=auto, verbose=True, seed=0, deterministic=True, single_cls=False, rect=False, cos_lr=False, close_mosaic=10, resume=False, amp=False, fraction=1.0, profile=False, freeze=None, multi_scale=False, overlap_mask=True, mask_ratio=4, dropout=0.0, val=True, split=val, save_json=False, save_hybrid=False, conf=None, iou=0.7, max_det=300, half=False, dnn=False, plots=True, source=None, vid_stride=1, stream_buffer=False, visualize=False, augment=False, agnostic_nms=False, classes=None, retina_masks=False, embed=None, show=False, save_frames=False, save_txt=False, save_conf=False, save_crop=False, show_labels=True, show_conf=True, show_boxes=True, line_width=None, format=torchscript, keras=False, optimize=False, int8=False, dynamic=False, simplify=True, opset=None, workspace=4, nms=False, lr0=0.001, lrf=0.01, momentum=0.937, weight_decay=0.0005, warmup_epochs=3.0, warmup_momentum=0.8, warmup_bias_lr=0.1, box=7.5, cls=0.5, dfl=1.5, pose=12.0, kobj=1.0, label_smoothing=0.0, nbs=64, hsv_h=0.015, hsv_s=0.7, hsv_v=0.4, degrees=0.0, translate=0.1, scale=0.5, shear=0.0, perspective=0.0, flipud=0.0, fliplr=0.5, bgr=0.0, mosaic=1.0, mixup=0.0, copy_paste=0.0, copy_paste_mode=flip, auto_augment=randaugment, erasing=0.4, crop_fraction=1.0, cfg=None, tracker=botsort.yaml, save_dir=runs/detect/train9
-Overriding model.yaml nc=80 with nc=6
+from ultralytics import YOLO
+import os
+import cv2
 
-                   from  n    params  module                                       arguments                     
-  0                  -1  1      1856  ultralytics.nn.modules.conv.Conv             [3, 64, 3, 2]                 
-  1                  -1  1     73984  ultralytics.nn.modules.conv.Conv             [64, 128, 3, 2]               
-  2                  -1  1    111872  ultralytics.nn.modules.block.C3k2            [128, 256, 1, True, 0.25]     
-  3                  -1  1    590336  ultralytics.nn.modules.conv.Conv             [256, 256, 3, 2]              
-  4                  -1  1    444928  ultralytics.nn.modules.block.C3k2            [256, 512, 1, True, 0.25]     
-  5                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
-  6                  -1  1   1380352  ultralytics.nn.modules.block.C3k2            [512, 512, 1, True]           
-  7                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
-  8                  -1  1   1380352  ultralytics.nn.modules.block.C3k2            [512, 512, 1, True]           
-  9                  -1  1    656896  ultralytics.nn.modules.block.SPPF            [512, 512, 5]                 
- 10                  -1  1    990976  ultralytics.nn.modules.block.C2PSA           [512, 512, 1]                 
- 11                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
- 12             [-1, 6]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
- 13                  -1  1   1642496  ultralytics.nn.modules.block.C3k2            [1024, 512, 1, True]          
- 14                  -1  1         0  torch.nn.modules.upsampling.Upsample         [None, 2, 'nearest']          
- 15             [-1, 4]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
- 16                  -1  1    542720  ultralytics.nn.modules.block.C3k2            [1024, 256, 1, True]          
- 17                  -1  1    590336  ultralytics.nn.modules.conv.Conv             [256, 256, 3, 2]              
- 18            [-1, 13]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
- 19                  -1  1   1511424  ultralytics.nn.modules.block.C3k2            [768, 512, 1, True]           
- 20                  -1  1   2360320  ultralytics.nn.modules.conv.Conv             [512, 512, 3, 2]              
- 21            [-1, 10]  1         0  ultralytics.nn.modules.conv.Concat           [1]                           
- 22                  -1  1   1642496  ultralytics.nn.modules.block.C3k2            [1024, 512, 1, True]          
- 23        [16, 19, 22]  1   1415650  ultralytics.nn.modules.head.Detect           [6, [256, 512, 512]]          
-YOLO11m summary: 409 layers, 20,057,634 parameters, 20,057,618 gradients, 68.2 GFLOPs
+# YOLO 모델 로드
+model = YOLO('/home/jovyan/yolo11pre/yolo11m.pt')
 
-Transferred 643/649 items from pretrained weights
-TensorBoard: Start with 'tensorboard --logdir runs/detect/train9', view at http://localhost:6006/
-Freezing layer 'model.23.dfl.conv.weight'
-train: Scanning /home/jovyan/Y_T_Data/train/augmented_images... 0 images, 25962 backgrounds, 0 corrupt: 100%|██████████| 25962/25962 [00:10<00:00, 2475.28it/s]
-train: WARNING ⚠️ No labels found in /home/jovyan/Y_T_Data/train/augmented_images.cache. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
-train: New cache created: /home/jovyan/Y_T_Data/train/augmented_images.cache
-WARNING ⚠️ No labels found in /home/jovyan/Y_T_Data/train/augmented_images.cache, training may not work correctly. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
-/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/albumentations/check_version.py:49: UserWarning: Error fetching version info <urlopen error _ssl.c:990: The handshake operation timed out>
-  data = fetch_version_info()
-albumentations: Blur(p=0.01, blur_limit=(3, 7)), MedianBlur(p=0.01, blur_limit=(3, 7)), ToGray(p=0.01, num_output_channels=3, method='weighted_average'), CLAHE(p=0.01, clip_limit=(1, 4.0), tile_grid_size=(8, 8))
-val: Scanning /home/jovyan/Y_T_Data/val/image... 0 images, 30 backgrounds, 0 corrupt: 100%|██████████| 30/30 [00:00<00:00, 1876.87it/s]
-val: WARNING ⚠️ No labels found in /home/jovyan/Y_T_Data/val/image.cache. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
-val: New cache created: /home/jovyan/Y_T_Data/val/image.cache
-WARNING ⚠️ No labels found in /home/jovyan/Y_T_Data/val/image.cache, training may not work correctly. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
-Plotting labels to runs/detect/train9/labels.jpg... 
-zero-size array to reduction operation maximum which has no identity
-optimizer: 'optimizer=auto' found, ignoring 'lr0=0.001' and 'momentum=0.937' and determining best 'optimizer', 'lr0' and 'momentum' automatically... 
-optimizer: AdamW(lr=0.001, momentum=0.9) with parameter groups 106 weight(decay=0.0), 113 weight(decay=0.0005), 112 bias(decay=0.0)
-TensorBoard: model graph visualization added ✅
-Image sizes 640 train, 640 val
-Using 8 dataloader workers
-Logging results to runs/detect/train9
-Starting training for 1 epochs...
+# 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
+train_data = '/home/jovyan/Y_T_Data/Y_T_Dataset.yaml'
 
-      Epoch    GPU_mem   box_loss   cls_loss   dfl_loss  Instances       Size
-        1/1      18.5G          0      33.04          0          0        640:  47%|████▋     | 763/1623 [06:21<07:08,  2.00it/s]
+# 학습 결과를 저장할 디렉토리 생성
+output_dir = '/home/jovyan/Y_T_Output/'
+os.makedirs(output_dir, exist_ok=True)
+
+# 학습 실행
+model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False)
+
+# 학습된 모델 저장
+model.save(os.path.join(output_dir, 'fine_tuned_yolov11n.pt'))
+
+# 테스트를 위한 디렉토리 설정
+test_image_dir = '/home/jovyan/test_image'
+test_results_dir = os.path.join(output_dir, 'Y_T_test_results/')
+os.makedirs(test_results_dir, exist_ok=True)
+
+# 테스트 결과 저장 함수
+def save_test_results(image_path, results):
+    # 결과 이미지 저장
+    result_image = results.imgs[0]
+    filename = os.path.basename(image_path).replace('.JPG', '_result.png')  # .JPG 확장자 처리
+    result_image_path = os.path.join(test_results_dir, filename)
+    cv2.imwrite(result_image_path, result_image)
+    
+    # 결과 텍스트 저장
+    txt_filename = os.path.basename(image_path).replace('.JPG', '_result.txt')  # .JPG 확장자 처리
+    result_txt_path = os.path.join(test_results_dir, txt_filename)
+    with open(result_txt_path, 'w') as f:
+        f.write(f"Detected Objects:\n")
+        for i, result in enumerate(results):
+            boxes = result.boxes.xyxy.cpu().numpy()
+            f.write(f"Object {i + 1}:\n")
+            for box in boxes:
+                x1, y1, x2, y2 = box[:4].astype(int)
+                f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+    print(f"Results saved to {result_txt_path} and {result_image_path}")
+
+# 테스트 실행 함수
+def test_model():
+    for image_file in os.listdir(test_image_dir):
+        if image_file.endswith('.JPG'):  # .JPG 확장자 처리
+            image_path = os.path.join(test_image_dir, image_file)
+            # 테스트 수행
+            results = model(image_path)
+            save_test_results(image_path, results)
+
+# 테스트 실행
+test_model()
