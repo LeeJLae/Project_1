@@ -44,6 +44,6 @@ Traceback (most recent call last):
     buf = self._recv_bytes(maxlength)
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/multiprocessing/connection.py", line 414, in _recv_bytes
     buf = self._recv(4)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/multiprocessing/connection.py", line 383, in _recv
-    raise EOFError
-EOFError
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/multiprocessing/connection.py", line 379, in _recv
+    chunk = read(handle, remaining)
+ConnectionResetError: [Errno 104] Connection reset by peer
