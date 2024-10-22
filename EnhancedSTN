@@ -3,24 +3,24 @@ import os
 import cv2
 
 # YOLO 모델 로드
-model = YOLO('/home/jovyan/yolo8obb/yolov8n.pt')
+model = YOLO('/home/jovyan/yolo8obb/yolov8m.pt')
 
 # 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/Y_T_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Y_T_Result/obb/yolov8n'
+output_dir = '/home/jovyan/data-vol-1/Y_T_Result/obb/yolov8m'
 os.makedirs(output_dir, exist_ok=True)
 
 # 학습 실행 (검증 데이터 사용 안 함)
 model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
 
 # 학습된 모델 저장
-model.save(os.path.join(output_dir, 'fine_tuned_yolov8n_obb.pt'))
+model.save(os.path.join(output_dir, 'fine_tuned_yolov8m_obb.pt'))
 
 # 테스트를 위한 디렉토리 설정
 test_image_dir = '/home/jovyan/test_image'
-test_results_dir = os.path.join(output_dir, 'Y_T_test_8n_obb_results/')
+test_results_dir = os.path.join(output_dir, 'Y_T_test_8m_obb_results/')
 os.makedirs(test_results_dir, exist_ok=True)
 
 # 테스트 결과 저장 함수
