@@ -45,7 +45,7 @@ def augment_image_and_label(image_path, label_path):
     labels = label_file.readlines()
     label_file.close()
 
-    for angle in np.arange(-50, 50.5, 0.5):  # -90도 ~ 90도까지 0.5도씩 회전
+    for angle in np.arange(-50, 50.5, 0.5):  
         # 데이터 증강 설정 (각도별 회전)
         transform = A.Compose([
             A.Rotate(limit=(angle, angle), border_mode=cv2.BORDER_CONSTANT, p=1.0),  # 각도를 고정해서 회전
