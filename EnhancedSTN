@@ -8,7 +8,7 @@ train_image_dir = '/home/jovyan/Y_T_Image'
 train_label_dir = '/home/jovyan/Y_T_Txt'
 
 # 증강된 라벨 파일을 저장할 폴더 생성
-augmented_label_dir = os.path.join(train_label_dir, 'augmented_labels_obb')
+augmented_label_dir = os.path.join(train_label_dir, 'augmented_labels_obb2')
 os.makedirs(augmented_label_dir, exist_ok=True)
 
 # 이미지와 바운딩 박스 좌표를 회전시키는 함수
@@ -64,8 +64,8 @@ def augment_label_only(image_path, label_path):
                 x_center_new, y_center_new, width_new, height_new = rotate_bounding_box(
                     x_center, y_center, width, height, angle, image.shape
                 )
-                # 회전 각도(angle) 값을 추가
-                f.write(f"{x_center_new} {y_center_new} {width_new} {height_new} {angle}\n")
+                # 클래스 넘버(class_id)와 회전 각도(angle) 값을 추가
+                f.write(f"{int(class_id)} {x_center_new} {y_center_new} {width_new} {height_new} {angle}\n")
 
 # 학습 데이터에 대해 모든 각도(-180 ~ 180) 증강 적용
 for image_file in os.listdir(train_image_dir):
@@ -73,4 +73,3 @@ for image_file in os.listdir(train_image_dir):
         image_path = os.path.join(train_image_dir, image_file)
         label_path = os.path.join(train_label_dir, image_file.replace('.jpg', '.txt'))
         augment_label_only(image_path, label_path)
-
