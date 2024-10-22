@@ -1,7 +1,12 @@
-  File "/home/jovyan/jonglae/Retry1/2. B-BOX/1-1_obb_YOLO_11m.py", line 66, in <module>
-    test_model()
-  File "/home/jovyan/jonglae/Retry1/2. B-BOX/1-1_obb_YOLO_11m.py", line 63, in test_model
-    save_test_results(image_path, results)
-  File "/home/jovyan/jonglae/Retry1/2. B-BOX/1-1_obb_YOLO_11m.py", line 35, in save_test_results
-    boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-AttributeError: 'NoneType' object has no attribute 'xyxy'
+def save_test_results(image_path, results):
+    # 결과 이미지 가져오기
+    image = cv2.imread(image_path)
+    filename = os.path.basename(image_path).replace('.JPG', '_result.png')
+    result_image_path = os.path.join(test_results_dir, filename)
+
+    # 감지된 객체에 대한 바운딩 박스 그리기
+    for result in results:
+        boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+        for box in boxes:
+            x1, y1, x2, y2 = box[:4].astype(int)
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
