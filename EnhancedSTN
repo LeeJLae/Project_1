@@ -1,20 +1,66 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/2. B-BOX/baes_yolo_obb_detection.py", line 16, in <module>
-    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 802, in train
-    self.trainer.train()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 207, in train
-    self._do_train(world_size)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 437, in _do_train
-    self.metrics, self.fitness = self.validate()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 602, in validate
-    metrics = self.validator(self)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/validator.py", line 196, in __call__
-    stats = self.get_stats()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/models/yolo/detect/val.py", line 181, in get_stats
-    stats = {k: torch.cat(v, 0).cpu().numpy() for k, v in self.stats.items()}  # to numpy
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/models/yolo/detect/val.py", line 181, in <dictcomp>
-    stats = {k: torch.cat(v, 0).cpu().numpy() for k, v in self.stats.items()}  # to numpy
-RuntimeError: torch.cat(): expected a non-empty list of Tensors
+from ultralytics import YOLO
+import os
+import cv2
+
+# YOLO 모델 로드
+model = YOLO('/home/jovyan/yolo8pre/yolov8m.pt')
+
+# 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
+train_data = '/home/jovyan/Y_T_Data/Y_T_Dataset.yaml'
+
+# 학습 결과를 저장할 디렉토리 생성
+output_dir = '/home/jovyan/Y_T_Output_8m/'
+os.makedirs(output_dir, exist_ok=True)
+
+# 학습 실행 (검증 데이터 사용 안 함)
+model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
+
+# 학습된 모델 저장
+model.save(os.path.join(output_dir, 'fine_tuned_yolov8m.pt'))
+
+# 테스트를 위한 디렉토리 설정
+test_image_dir = '/home/jovyan/test_image'
+test_results_dir = os.path.join(output_dir, 'Y_T_test_v8m_results/')
+os.makedirs(test_results_dir, exist_ok=True)
+
+# 테스트 결과 저장 함수
+def save_test_results(image_path, results):
+    # 결과 이미지 가져오기
+    image = cv2.imread(image_path)
+    filename = os.path.basename(image_path).replace('.JPG', '_result.png')
+    result_image_path = os.path.join(test_results_dir, filename)
+
+    # 감지된 객체에 대한 바운딩 박스 그리기
+    for result in results:
+        boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+        for box in boxes:
+            x1, y1, x2, y2 = box[:4].astype(int)
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
+    
+    # 수정된 이미지를 저장
+    cv2.imwrite(result_image_path, image)
+    
+    # 결과 텍스트 저장
+    txt_filename = os.path.basename(image_path).replace('.JPG', '_result.txt')
+    result_txt_path = os.path.join(test_results_dir, txt_filename)
+    with open(result_txt_path, 'w') as f:
+        f.write(f"Detected Objects:\n")
+        for i, result in enumerate(results):
+            boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+            f.write(f"Object {i + 1}:\n")
+            for box in boxes:
+                x1, y1, x2, y2 = box[:4].astype(int)
+                f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+    print(f"Results saved to {result_txt_path} and {result_image_path}")
+
+# 테스트 실행 함수
+def test_model():
+    for image_file in os.listdir(test_image_dir):
+        if image_file.endswith('.JPG'):  # .JPG 확장자 처리
+            image_path = os.path.join(test_image_dir, image_file)
+            # 테스트 수행
+            results = model(image_path)
+            save_test_results(image_path, results)
+
+# 테스트 실행
+test_model()
