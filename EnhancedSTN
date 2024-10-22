@@ -9,18 +9,18 @@ model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/Y_T_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Y_T_Result/obb/yolov11m'
+output_dir = '/home/jovyan/data-vol-1/Y_T_Result/obb/yolov11m_32b_40e'
 os.makedirs(output_dir, exist_ok=True)
 
 # 학습 실행 (검증 데이터 사용 안 함)
-model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
+model.train(data=train_data, epochs=40, imgsz=640, batch=32, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
 
 # 학습된 모델 저장
-model.save(os.path.join(output_dir, 'fine_tuned_yolov11m_obb.pt'))
+model.save(os.path.join(output_dir, 'fine_tuned_yolov11m_obb_32b_40e.pt'))
 
 # 테스트를 위한 디렉토리 설정
 test_image_dir = '/home/jovyan/test_image'
-test_results_dir = os.path.join(output_dir, 'Y_T_test_11m_obb_results/')
+test_results_dir = os.path.join(output_dir, 'Y_T_test_11m_obb_results_32b_40e/')
 os.makedirs(test_results_dir, exist_ok=True)
 
 # 테스트 결과 저장 함수
@@ -37,32 +37,35 @@ def save_test_results(image_path, results):
 
     # 감지된 객체에 대한 바운딩 박스 그리기
     for result in results:
-        if result is not None and result.boxes is not None:
-            boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-            for box in boxes:
-                x1, y1, x2, y2 = box[:4].astype(int)
-                cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
+        if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
+            if hasattr(result.boxes, 'xyxy'):
+                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+                for box in boxes:
+                    x1, y1, x2, y2 = box[:4].astype(int)
+                    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
+            else:
+                print(f"'boxes' attribute has no 'xyxy' data for {image_path}")
         else:
             print(f"Result or result.boxes is None for {image_path}")
 
     # 결과 이미지를 파일로 저장
     cv2.imwrite(result_image_path, image)
     print(f"Saved result image to {result_image_path}")
-    
-    # 수정된 이미지를 저장
-    cv2.imwrite(result_image_path, image)
-    
+
     # 결과 텍스트 저장
     txt_filename = os.path.basename(image_path).replace('.JPG', '_result.txt')
     result_txt_path = os.path.join(test_results_dir, txt_filename)
     with open(result_txt_path, 'w') as f:
         f.write(f"Detected Objects:\n")
         for i, result in enumerate(results):
-            boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-            f.write(f"Object {i + 1}:\n")
-            for box in boxes:
-                x1, y1, x2, y2 = box[:4].astype(int)
-                f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+            if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
+                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+                f.write(f"Object {i + 1}:\n")
+                for box in boxes:
+                    x1, y1, x2, y2 = box[:4].astype(int)
+                    f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+            else:
+                f.write(f"No valid result or bounding box for Object {i + 1}\n")
     print(f"Results saved to {result_txt_path} and {result_image_path}")
 
 # 테스트 실행 함수
