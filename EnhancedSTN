@@ -9,18 +9,18 @@ model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/yolov11m_16b_1e'
+output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/yolov11m_16b_10e'
 os.makedirs(output_dir, exist_ok=True)
 
 # 학습 실행 (검증 데이터 사용 안 함)
-model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
+model.train(data=train_data, epochs=10, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
 
 # 학습된 모델 저장
-model.save(os.path.join(output_dir, 'fine_tuned_yolov11x_obb_16b_1e.pt'))
+model.save(os.path.join(output_dir, 'fine_tuned_yolov11x_obb_16b_10e.pt'))
 
 # 테스트를 위한 디렉토리 설정
 test_image_dir = '/home/jovyan/test_image'
-test_results_dir = os.path.join(output_dir, 'Y_T_test_11x_obb_results_16b_1e/')
+test_results_dir = os.path.join(output_dir, 'Y_T_test_11x_obb_results_16b_10e/')
 os.makedirs(test_results_dir, exist_ok=True)
 
 # 테스트 결과 저장 함수
