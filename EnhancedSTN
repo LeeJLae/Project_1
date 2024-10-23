@@ -1,118 +1,26 @@
-    import os
-import cv2
-import numpy as np
-import random
-
-# 바운딩 박스를 회전하는 함수
-def rotate_bbox(bbox, angle, image_shape):
-    h, w = image_shape[:2]
-    points = np.array([[bbox[0], bbox[1]], [bbox[2], bbox[3]], [bbox[4], bbox[5]], [bbox[6], bbox[7]]])
-    
-    # 회전 변환 행렬 계산
-    rotation_matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
-    
-    # 좌표 변환
-    rotated_points = cv2.transform(np.array([points]), rotation_matrix)[0]
-    return rotated_points.flatten().tolist()
-
-# 이미지 및 바운딩 박스 회전 후 저장하는 함수
-def augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees=(-50, 50)):
-    # 이미지 불러오기
-    image = cv2.imread(image_path)
-    bboxes = []
-    
-    # TXT 파일에서 9개 좌표 OBB 형식으로 바운딩 박스 좌표 읽기
-    with open(txt_path, 'r') as f:
-        for line in f:
-            values = list(map(float, line.strip().split()))
-            bboxes.append(values)
-    
-    h, w, _ = image.shape
-    augmented_images = []
-    
-    # 각도별로 이미지와 바운딩 박스 회전
-    for degree in range(degrees[0], degrees[1] + 1):
-        rotation_matrix = cv2.getRotationMatrix2D((w / 2, h / 2), degree, 1.0)
-        rotated_image = cv2.warpAffine(image, rotation_matrix, (w, h))
-        
-        # 동일한 이름을 가진 이미지와 TXT 파일 저장
-        filename = f"{os.path.splitext(os.path.basename(image_path))[0]}_rot{degree}"
-        rotated_image_path = os.path.join(output_image_dir, f"{filename}.png")
-        output_txt_path = os.path.join(output_txt_dir, f"{filename}.txt")
-        
-        # 변환된 이미지 저장
-        cv2.imwrite(rotated_image_path, rotated_image)
-        
-        # 바운딩 박스 회전 및 저장
-        with open(output_txt_path, 'w') as f:
-            rotated_bboxes = []
-            for bbox in bboxes:
-                class_id = bbox[0]
-                obb_coords = bbox[1:]  # x1, y1, x2, y2, x3, y3, x4, y4
-                rotated_obb_coords = rotate_bbox(obb_coords, degree, image.shape)
-                rotated_bboxes.append([class_id] + rotated_obb_coords)
-                f.write(f"{class_id} {' '.join(map(str, rotated_obb_coords))}\n")
-        
-        # 증강된 이미지 목록에 추가
-        augmented_images.append((rotated_image_path, rotated_bboxes))
-    
-    return augmented_images
-
-# 무작위로 10개의 이미지를 선택하여 바운딩 박스를 그린 후 저장
-def save_random_bbox_images(augmented_images, output_bbox_image_dir):
-    os.makedirs(output_bbox_image_dir, exist_ok=True)
-    
-    # 무작위로 10개의 증강된 이미지 선택
-    random_images = random.sample(augmented_images, 10)
-    
-    for image_path, bboxes in random_images:
-        image = cv2.imread(image_path)
-        output_image_path = os.path.join(output_bbox_image_dir, os.path.basename(image_path))
-        draw_bboxes(image, bboxes, output_image_path)
-
-# 바운딩 박스를 이미지에 그리는 함수
-def draw_bboxes(image, bboxes, output_image_path):
-    for bbox in bboxes:
-        class_id, x1, y1, x2, y2, x3, y3, x4, y4 = bbox
-        
-        # 4개의 꼭짓점을 사용해 바운딩 박스 그리기
-        points = [(int(x1), int(y1)), (int(x2), int(y2)), (int(x3), int(y3)), (int(x4), int(y4))]
-        
-        # 폴리곤 형태로 그리기 (초록색, 두께 2)
-        cv2.polylines(image, [np.array(points)], isClosed=True, color=(0, 255, 0), thickness=2)
-    
-    # 바운딩 박스가 그려진 이미지 저장
-    cv2.imwrite(output_image_path, image)
-    print(f"Saved image with B-box: {output_image_path}")
-
-# 모든 이미지 및 TXT 파일에 대해 증강
-def process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, output_bbox_image_dir, degrees=(-50, 50)):
-    os.makedirs(output_image_dir, exist_ok=True)
-    os.makedirs(output_txt_dir, exist_ok=True)
-    
-    all_augmented_images = []
-    
-    for image_file in os.listdir(image_dir):
-        if image_file.endswith('.png') or image_file.endswith('.jpg'):
-            image_path = os.path.join(image_dir, image_file)
-            txt_path = os.path.join(txt_dir, image_file.replace('.png', '.txt').replace('.jpg', '.txt'))
-            
-            if os.path.exists(txt_path):
-                augmented_images = augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees)
-                all_augmented_images.extend(augmented_images)
-    
-    # 무작위로 10개의 이미지를 선택하여 바운딩 박스 그리기
-    save_random_bbox_images(all_augmented_images, output_bbox_image_dir)
-
-# 경로 설정
-image_dir = '/home/jovyan/data-vol-1/dataset/origin/images'  # 원본 이미지 경로
-txt_dir = '/home/jovyan/data-vol-1/dataset/origin/labels'  # 9개 좌표 형식의 TXT 파일 경로
-output_image_dir = '/home/jovyan/data-vol-1/2nd/dataset/train/images'  # 증강된 이미지 저장 경로
-output_txt_dir = '/home/jovyan/data-vol-1/2nd/dataset/train/labels'  # 증강된 TXT 파일 저장 경로
-output_bbox_image_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/check4'  # 바운딩 박스가 그려진 이미지 저장 경로
-
-# -50도 ~ 50도 범위로 증강 실행
-process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, output_bbox_image_dir, degrees=(-50, 50))
-
-    
-    
+New cache created: /home/jovyan/data-vol-1/2nd/dataset/train/labels.cache
+WARNING ⚠️ No images found in /home/jovyan/data-vol-1/2nd/dataset/train/labels.cache, training may not work correctly. See https://docs.ultralytics.com/datasets for dataset formatting guidance.
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/2. B-BOX/1-1_obb_YOLO_11m.py", line 16, in <module>
+    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 802, in train
+    self.trainer.train()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 207, in train
+    self._do_train(world_size)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 327, in _do_train
+    self._setup_train(world_size)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 291, in _setup_train
+    self.train_loader = self.get_dataloader(self.trainset, batch_size=batch_size, rank=LOCAL_RANK, mode="train")
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/models/yolo/detect/train.py", line 49, in get_dataloader
+    dataset = self.build_dataset(dataset_path, mode, batch_size)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/models/yolo/detect/train.py", line 43, in build_dataset
+    return build_yolo_dataset(self.args, img_path, batch, self.data, mode=mode, rect=mode == "val", stride=gs)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/build.py", line 87, in build_yolo_dataset
+    return dataset(
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/dataset.py", line 65, in __init__
+    super().__init__(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/base.py", line 74, in __init__
+    self.labels = self.get_labels()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/dataset.py", line 164, in get_labels
+    len_cls, len_boxes, len_segments = (sum(x) for x in zip(*lengths))
+ValueError: not enough values to unpack (expected 3, got 0)
