@@ -1,5 +1,147 @@
-Validation Set - 평균: 73.04976453793128, 표준편차: 87.54003607600832, 이미지 크기: (3507, 3507)
-Test Set - 평균: 178.98645266620628, 표준편차: 50.43044234475176, 이미지 크기: (181, 184)
-Validation 이미지 크기: (3507, 3507), 테스트 이미지 크기: (181, 184). 크기가 다릅니다.
-Validation Set 평균 픽셀 값: 73.04976453793128, Test Set 평균 픽셀 값: 178.98645266620628
-Validation Set 픽셀 값 표준편차: 87.54003607600832, Test Set 픽셀 값 표준편차: 50.43044234475176
+# threshold // customYOLO
+
+from ultralytics import YOLO
+import os
+import cv2
+import torch
+
+# Custom YOLO class with modified loss function focusing on box_loss
+class CustomYOLO(YOLO):
+    def __init__(self, weights):
+        super().__init__(weights)
+        # 손실 가중치 설정
+        self.box_weight = 1.5  # box_loss 가중치 증가
+        self.cls_weight = 0.8  # cls_loss 가중치
+        self.obj_weight = 1.2  # obj_loss 가중치
+
+    # 손실 함수 재정의
+    def loss_fn(self, predictions, targets):
+        # YOLO 기본 손실 계산 호출
+        losses = self.model.loss(predictions, targets)
+        box_loss = losses[0]
+        obj_loss = losses[1]
+        cls_loss = losses[2]
+
+        # box_loss에 더 높은 가중치 적용
+        total_loss = (self.box_weight * box_loss) + (self.cls_weight * cls_loss) + (self.obj_weight * obj_loss)
+        return total_loss
+
+# 첫 번째 단계 (Pretrained 모델로 초기 학습 진행)
+def first_stage_training():
+    model = CustomYOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
+
+    # 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
+    train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
+
+    # 학습 결과를 저장할 디렉토리 생성
+    output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/Custom_1st_yolov11m_16b_50e'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 첫 번째 단계 학습 실행 (Validation 포함)
+    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=30, val=True)
+
+    # 학습된 모델 저장 (first stage 가중치 파일)
+    model.save(os.path.join(output_dir, 'Custom_1st_yolov11m_obb_16b_50e.pt'))
+    
+    # 가중치 파일 경로 반환
+    return os.path.join(output_dir, 'Custom_1st_yolov11l_obb_16b_50e.pt')
+
+# 두 번째 단계 (첫 번째 학습 결과를 이용해 추가 학습 진행)
+def second_stage_training(first_stage_weight):
+    model = CustomYOLO(first_stage_weight)
+
+    # 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
+    train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
+
+    # 두 번째 단계 학습 (미세 조정)
+    output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/Custom_2nd_yolov11m_16b_50e'
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 두 번째 단계 학습 실행 (Batch Size 16, 추가 학습)
+    model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.0001, device='cuda', amp=False, val=True)
+
+    # 학습된 모델 저장 (second stage 가중치 파일)
+    model.save(os.path.join(output_dir, 'Custom_2nd_yolov11m_obb_16b_50e.pt'))
+
+    return os.path.join(output_dir, 'Custom_2nd_yolov11m_obb_16b_50e.pt')
+
+# 바운딩 박스를 그리고 결과 이미지를 저장하는 함수 (신뢰도 임계값 적용)
+def save_test_results(image_path, results, test_results_dir, conf_threshold=0.25):
+    # 결과 이미지 가져오기
+    image = cv2.imread(image_path)  # PNG 이미지를 읽어옴
+    filename = os.path.basename(image_path).replace('.png', '_result.png')  # PNG 형식에 맞게 저장 파일 이름 생성
+    result_image_path = os.path.join(test_results_dir, filename)
+
+    # 결과가 있는지 확인
+    if results is None or len(results) == 0:
+        print(f"No detection results for {image_path}")
+        return
+
+    # 감지된 객체에 대한 바운딩 박스 그리기
+    for result in results:
+        if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
+            if hasattr(result.boxes, 'xyxy'):
+                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+                scores = result.boxes.conf.cpu().numpy()  # 신뢰도 점수 가져오기
+
+                # 임계값 이상의 바운딩 박스만 그리기
+                for box, score in zip(boxes, scores):
+                    if score >= conf_threshold:
+                        x1, y1, x2, y2 = box[:4].astype(int)
+                        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
+                        # 신뢰도 점수 표시 (선택 사항)
+                        cv2.putText(image, f'{score:.2f}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+    # 결과 이미지를 PNG 파일로 저장
+    cv2.imwrite(result_image_path, image)
+    print(f"Saved result image to {result_image_path}")
+
+    # 결과 텍스트 저장
+    txt_filename = os.path.basename(image_path).replace('.png', '_result.txt')
+    result_txt_path = os.path.join(test_results_dir, txt_filename)
+    with open(result_txt_path, 'w') as f:
+        f.write(f"Detected Objects:\n")
+        for i, result in enumerate(results):
+            if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
+                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
+                f.write(f"Object {i + 1}:\n")
+                for box in boxes:
+                    x1, y1, x2, y2 = box[:4].astype(int)
+                    f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
+            else:
+                f.write(f"No valid result or bounding box for Object {i + 1}\n")
+    print(f"Results saved to {result_txt_path} and {result_image_path}")
+
+
+# 테스트 실행 함수
+def test_model(model, test_image_dir, test_results_dir, conf_threshold=0.25):
+    os.makedirs(test_results_dir, exist_ok=True)
+    for image_file in os.listdir(test_image_dir):
+        if image_file.endswith('.png'):  # .png 확장자 처리
+            image_path = os.path.join(test_image_dir, image_file)
+            # 테스트 수행
+            results = model(image_path)
+            save_test_results(image_path, results, test_results_dir, conf_threshold)
+
+# 전체 프로세스 실행
+def main():
+    # 첫 번째 단계 학습
+    first_stage_weight = first_stage_training()
+
+    # 두 번째 단계 학습
+    second_stage_weight = second_stage_training(first_stage_weight)
+
+    # 테스트 실행 (두 번째 단계 모델로 테스트)
+    test_image_dir = '/home/jovyan/test_image2'
+    test_results_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb'
+    model = CustomYOLO(second_stage_weight)
+
+    # 신뢰도 임계값 설정
+    conf_threshold = 0.25
+
+    # 테스트 모델 실행
+    test_model(model, test_image_dir, test_results_dir, conf_threshold)
+
+# 메인 실행
+if __name__ == "__main__":
+    main()
