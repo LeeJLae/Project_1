@@ -1,43 +1,155 @@
-/home/jovyan/.conda/envs/aipbase/bin/python /home/jovyan/jonglae/Retry1/NewYOLO/3.AD2_Contrastive_resnet50.py
-/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
-  warnings.warn(
-/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
-  warnings.warn(msg)
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/NewYOLO/3.AD2_Contrastive_resnet50.py", line 97, in <module>
-    train_model(model, optimizer, contrastive_loss_fn, epochs=1, train_data=train_data)
-  File "/home/jovyan/jonglae/Retry1/NewYOLO/3.AD2_Contrastive_resnet50.py", line 77, in train_model
-    outputs = model(train_data)  # 데이터 입력
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/jonglae/Retry1/NewYOLO/3.AD2_Contrastive_resnet50.py", line 56, in forward
-    _, z = self.simclr(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/jonglae/Retry1/NewYOLO/3.AD2_Contrastive_resnet50.py", line 20, in forward
-    h = self.encoder(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/resnet.py", line 285, in forward
-    return self._forward_impl(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/models/resnet.py", line 268, in _forward_impl
-    x = self.conv1(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 554, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 549, in _conv_forward
-    return F.conv2d(
-TypeError: conv2d() received an invalid combination of arguments - got (str, Parameter, NoneType, tuple, tuple, tuple, int), but expected one of:
- * (Tensor input, Tensor weight, Tensor bias = None, tuple of ints stride = 1, tuple of ints padding = 0, tuple of ints dilation = 1, int groups = 1)
-      didn't match because some of the arguments have invalid types: (str, Parameter, NoneType, tuple of (int, int), tuple of (int, int), tuple of (int, int), int)
- * (Tensor input, Tensor weight, Tensor bias = None, tuple of ints stride = 1, str padding = "valid", tuple of ints dilation = 1, int groups = 1)
-      didn't match because some of the arguments have invalid types: (str, Parameter, NoneType, tuple of (int, int), tuple of (int, int), tuple of (int, int), int)
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from ultralytics import YOLO
+from torchvision import models
+import os
+
+# SimCLR Backbone 정의
+class SimCLR(nn.Module):
+    def __init__(self, base_model, out_dim):
+        super(SimCLR, self).__init__()
+        self.encoder = base_model
+        self.projector = nn.Sequential(
+            nn.Linear(512, 256),  # ResNet의 출력 채널 크기에 맞춰서 설정
+            nn.ReLU(),
+            nn.Linear(256, out_dim)
+        )
+
+    def forward(self, x):
+        h = self.encoder(x)
+        z = self.projector(h)
+        return h, z
+
+# Contrastive Loss 정의
+class ContrastiveLoss(nn.Module):
+    def __init__(self, temperature=0.5):
+        super(ContrastiveLoss, self).__init__()
+        self.temperature = temperature
+        self.criterion = nn.CrossEntropyLoss()
+
+    def forward(self, z_i, z_j):
+        batch_size = z_i.size(0)
+        z = torch.cat((z_i, z_j), dim=0)
+        sim_matrix = torch.matmul(z, z.T) / self.temperature
+        sim_i_j = torch.diag(sim_matrix, batch_size)
+        sim_j_i = torch.diag(sim_matrix, -batch_size)
+        positives = torch.cat((sim_i_j, sim_j_i), dim=0)
+        labels = torch.arange(batch_size)
+        return self.criterion(positives, labels)
+
+# ResNet50 가중치 로드
+def load_pretrained_resnet(weights_path):
+    resnet = models.resnet50(pretrained=False)
+    resnet.load_state_dict(torch.load(weights_path))
+    resnet.fc = nn.Identity()  # fully connected 레이어 제거
+    return resnet
+
+# YOLO와 SimCLR을 결합한 모델 정의
+class YOLOWithSimCLR(nn.Module):
+    def __init__(self, yolo_model, simclr):
+        super(YOLOWithSimCLR, self).__init__()
+        self.yolo = yolo_model
+        self.simclr = simclr
+
+    def forward(self, x):
+        _, z = self.simclr(x)
+        return self.yolo(z)
+    
+    # 내부 YOLO 모델의 predict 메서드를 호출하는 predict 메서드 추가
+    def predict(self, *args, **kwargs):
+        return self.yolo.predict(*args, **kwargs)
+
+# YOLO 모델 로드 및 SimCLR 설정
+yolo_model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
+resnet_weights_path = '/home/jovyan/resnet_pretrain/resnet50.pth'
+resnet = load_pretrained_resnet(resnet_weights_path)
+simclr_model = SimCLR(base_model=resnet, out_dim=128)
+model = YOLOWithSimCLR(yolo_model.model, simclr_model)
+
+# Optimizer 및 손실 함수 설정
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+contrastive_loss_fn = ContrastiveLoss()
+
+# 1단계 학습 함수
+def train_model(model, epochs):
+    # Ultralytics YOLO의 `train()` 메서드 사용
+    model.train(
+        data='/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml',  # 데이터셋 경로 (.yaml 파일)
+        epochs=epochs,               # 에포크 설정
+        imgsz=640,
+        batch=16,
+        lr0=0.001,
+        device='cuda',
+        workers=4,             # 데이터 증강 활성화
+        hsv_h=0.015,              # 색상 증강
+        hsv_s=0.7,                # 채도 증강
+        hsv_v=0.4,                # 밝기 증강
+        flipud=0.5,               # 상하 반전
+        fliplr=0.5,               # 좌우 반전
+        translate=0.1,            # 수평 및 수직 이동
+        scale=0.5,                # 크기 조정
+        shear=0.2,                # 기울이기
+        perspective=0.1,          # 투시 변환
+        mosaic=1.0,               # 모자이크 증강
+        mixup=0.2,                # MixUp 증강
+        copy_paste=0.1,
+        amp=False            # Copy-Paste 증강
+    )
+# 1단계 학습 실행
+train_model(yolo_model, epochs=1)
+
+# 학습 완료 후 모델 저장
+output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16'
+os.makedirs(output_dir, exist_ok=True)
+model_save_path = os.path.join(output_dir, 'SimCLR_YOLO_b16_model.pt')
+torch.save(model.state_dict(), model_save_path)
+
+# 2단계 Fine-tuning 학습 (데이터 증강 포함)
+def finetune_model(model, epochs):
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)  # Fine-tuning 학습률 조정
+
+    # Fine-tuning 시 YOLO 학습 진행
+    model.train(
+        data='/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml',  # 데이터셋 경로
+        epochs=epochs,               # Fine-tuning 에포크 설정
+        imgsz=640,
+        batch=16,
+        lr0=0.0001,
+        device='cuda',
+        workers=4,             # 데이터 증강 활성화
+        hsv_h=0.015,              # 색상 증강
+        hsv_s=0.7,                # 채도 증강
+        hsv_v=0.4,                # 밝기 증강
+        flipud=0.5,               # 상하 반전
+        fliplr=0.5,               # 좌우 반전
+        translate=0.1,            # 수평 및 수직 이동
+        scale=0.5,                # 크기 조정
+        shear=0.2,                # 기울이기
+        perspective=0.1,          # 투시 변환
+        mosaic=1.0,               # 모자이크 증강
+        mixup=0.2,                # MixUp 증강
+        copy_paste=0.1,
+        amp=False            # Copy-Paste 증강
+    )
+
+# 2단계 Fine-tuning 학습 실행
+finetune_model(yolo_model, epochs=1)
+
+# 테스트 함수 (`model.predict` 사용)
+def test_model():
+    # 모델 예측을 통해 테스트 수행 및 결과 저장
+    test_image_dir = '/home/jovyan/test_image2'
+    output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16_results'
+    os.makedirs(output_dir, exist_ok=True)
+    
+    results = model.predict(
+        source=test_image_dir,  # 테스트할 이미지 폴더 경로
+        save=True,              # 결과 이미지를 저장
+        project=output_dir,     # 저장할 기본 디렉토리
+        name="SimCLR_YOLO_results"  # 결과를 저장할 하위 폴더 이름
+    )
+    print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_b16_results')}")
+
+# 테스트 실행
+test_model()
