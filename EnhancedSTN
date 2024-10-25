@@ -9,18 +9,18 @@ model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/TEST1_1step_yolov11m'
+output_dir = '/home/jovyan/data-vol-1/Y_T_Result/newnew_obb/TEST4_yolov11m'
 os.makedirs(output_dir, exist_ok=True)
 
 # 학습 실행 (검증 데이터 사용 안 함)
 model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
 
 # 학습된 모델 저장
-model.save(os.path.join(output_dir, 'TEST1_1step_yolov11m.pt'))
+model.save(os.path.join(output_dir, 'TEST4_yolov11m.pt'))
 
 # 테스트를 위한 디렉토리 설정
 test_image_dir = '/home/jovyan/test_image2'
-test_results_dir = os.path.join(output_dir, 'TEST1_1step_yolov11m/')
+test_results_dir = os.path.join(output_dir, 'TEST4_yolov11m/')
 os.makedirs(test_results_dir, exist_ok=True)
 
 # 테스트 결과 저장 함수
@@ -70,6 +70,7 @@ def save_test_results(image_path, results):
 
 # 테스트 실행 함수
 def test_model():
+    model.eval()  # 모델을 평가 모드로 설정
     for image_file in os.listdir(test_image_dir):
         if image_file.endswith('.png'):  # .JPG 확장자 처리
             image_path = os.path.join(test_image_dir, image_file)
