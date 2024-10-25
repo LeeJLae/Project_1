@@ -1,81 +1,25 @@
-from ultralytics import YOLO
-import os
-import cv2
+Traceback (most recent call last):
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 559, in get_dataset
+    data = check_det_dataset(self.args.data)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/data/utils.py", line 268, in check_det_dataset
+    file = check_file(dataset)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/utils/checks.py", line 517, in check_file
+    raise FileNotFoundError(f"'{file}' does not exist")
+FileNotFoundError: 'runs/DOTAv1-ms.yaml' does not exist
 
-# YOLO 모델 로드
-model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
+The above exception was the direct cause of the following exception:
 
-# 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
-train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
-
-# 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Y_T_Result/new_obb/TEST1_1step_yolov11m'
-os.makedirs(output_dir, exist_ok=True)
-
-# 학습 실행 (검증 데이터 사용 안 함)
-model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, patience=20, val=False)
-
-# 학습된 모델 저장
-model.save(os.path.join(output_dir, 'TEST1_1step_yolov11m.pt'))
-
-# 테스트를 위한 디렉토리 설정
-test_image_dir = '/home/jovyan/test_image2'
-test_results_dir = os.path.join(output_dir, 'TEST1_1step_yolov11m/')
-os.makedirs(test_results_dir, exist_ok=True)
-
-# 테스트 결과 저장 함수
-def save_test_results(image_path, results):
-    # 결과 이미지 가져오기
-    image = cv2.imread(image_path)
-    filename = os.path.basename(image_path).replace('.png', '_result.png')
-    result_image_path = os.path.join(test_results_dir, filename)
-
-    # 결과가 있는지 확인
-    if results is None or len(results) == 0:
-        print(f"No detection results for {image_path}")
-        return
-
-    # 감지된 객체에 대한 바운딩 박스 그리기
-    for result in results:
-        if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
-            if hasattr(result.boxes, 'xyxy'):
-                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-                for box in boxes:
-                    x1, y1, x2, y2 = box[:4].astype(int)
-                    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)  # 바운딩 박스를 이미지에 그리기
-            else:
-                print(f"'boxes' attribute has no 'xyxy' data for {image_path}")
-        else:
-            print(f"Result or result.boxes is None for {image_path}")
-
-    # 결과 이미지를 파일로 저장
-    cv2.imwrite(result_image_path, image)
-    print(f"Saved result image to {result_image_path}")
-
-    # 결과 텍스트 저장
-    txt_filename = os.path.basename(image_path).replace('.png', '_result.txt')
-    result_txt_path = os.path.join(test_results_dir, txt_filename)
-    with open(result_txt_path, 'w') as f:
-        f.write(f"Detected Objects:\n")
-        for i, result in enumerate(results):
-            if result is not None and hasattr(result, 'boxes') and result.boxes is not None:
-                boxes = result.boxes.xyxy.cpu().numpy()  # bounding box 좌표 가져오기
-                f.write(f"Object {i + 1}:\n")
-                for box in boxes:
-                    x1, y1, x2, y2 = box[:4].astype(int)
-                    f.write(f"Bounding Box: ({x1}, {y1}), ({x2}, {y2})\n")
-            else:
-                f.write(f"No valid result or bounding box for Object {i + 1}\n")
-    print(f"Results saved to {result_txt_path} and {result_image_path}")
-
-# 테스트 실행 함수
-def test_model():
-    for image_file in os.listdir(test_image_dir):
-        if image_file.endswith('.png'):  # .JPG 확장자 처리
-            image_path = os.path.join(test_image_dir, image_file)
-            # 테스트 수행
-            results = model(image_path)
-            save_test_results(image_path, results)
-
-# 테스트 실행
-test_model()
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/YOLO/checkyolo4.py", line 63, in <module>
+    train_with_accumulation(model, train_data, epochs=1, batch_size=batch_size, accumulation_steps=accumulation_steps, image_size=image_size)
+  File "/home/jovyan/jonglae/Retry1/YOLO/checkyolo4.py", line 31, in train_with_accumulation
+    model.train()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 796, in train
+    self.trainer = (trainer or self._smart_load("trainer"))(overrides=args, _callbacks=self.callbacks)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/models/yolo/obb/train.py", line 29, in __init__
+    super().__init__(cfg, overrides, _callbacks)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 133, in __init__
+    self.trainset, self.testset = self.get_dataset()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 563, in get_dataset
+    raise RuntimeError(emojis(f"Dataset '{clean_url(self.args.data)}' error ❌ {e}")) from e
+RuntimeError: Dataset 'runs/DOTAv1-ms.yaml' error ❌ 'runs/DOTAv1-ms.yaml' does not exist
