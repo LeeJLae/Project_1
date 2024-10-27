@@ -1,174 +1,280 @@
+import os
 import torch
 import torch.nn as nn
-import os
-from ultralytics import YOLO
-from torchvision import models
-import shutil
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import cv2
+import random
 
-# # SimCLR Backbone 정의 (학습 시 정의된 것과 동일해야 함)
-# class SimCLR(nn.Module):
-#     def __init__(self, base_model, out_dim):
-#         super(SimCLR, self).__init__()
-#         self.encoder = base_model
-#         self.projector = nn.Sequential(
-#             nn.Linear(512, 256),
-#             nn.ReLU(),
-#             nn.Linear(256, out_dim)
-#         )
+# ResNet Bottleneck Block 정의
+class Bottleneck(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv3 = nn.Conv2d(out_channels, out_channels * 4, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_channels * 4)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels * 4:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * 4, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels * 4)
+            )
 
-#     def forward(self, x):
-#         h = self.encoder(x)
-#         z = self.projector(h)
-#         return h, z
-
-# # YOLO와 SimCLR을 결합한 모델 정의
-# class YOLOWithSimCLR(nn.Module):
-#     def __init__(self, yolo_model, simclr):
-#         super(YOLOWithSimCLR, self).__init__()
-#         self.yolo = yolo_model
-#         self.simclr = simclr
-
-#     def forward(self, x):
-#         _, z = self.simclr(x)  # SimCLR에서 특징 추출
-#         return self.yolo.model(z)  # YOLO 모델에 전달하여 예측 수행
-    
-#     def predict(self, *args, **kwargs):
-#         return self.yolo.predict(*args, **kwargs)
-
-# # 모델 로드 함수
-# def load_trained_model(model_path, num_classes):
-#     # YOLO 모델 초기화
-#     yolo_model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
-    
-#     # 현재 모델 구조의 마지막 레이어를 학습된 모델에 맞게 수정
-#     yolo_model.model.model[-1] = nn.Conv2d(256, num_classes, kernel_size=1)  # 마지막 레이어 재설정
-    
-#     # 가중치 로드 (마지막 레이어 제외)
-#     state_dict = torch.load(model_path)
-#     model_state_dict = yolo_model.model.state_dict()
-#     for name, param in state_dict.items():
-#         if name in model_state_dict and param.shape == model_state_dict[name].shape:
-#             model_state_dict[name].copy_(param)
-    
-#     yolo_model.eval()  # 모델을 평가 모드로 전환
-#     return yolo_model
-
-# # 테스트 함수
-# def test_model(model, test_image_dir, output_dir):
-#     # 출력 디렉토리 초기화
-#     if os.path.exists(output_dir):
-#         shutil.rmtree(output_dir)
-#     os.makedirs(output_dir, exist_ok=True)
-
-#     # 예측 및 결과 저장
-#     results = model.predict(
-#         source=test_image_dir,   # 테스트할 이미지 폴더 경로
-#         save=True,               # 결과 이미지를 저장
-#         project=output_dir,      # 저장할 기본 디렉토리
-#         name="SimCLR_YOLO_results"  # 결과를 저장할 하위 폴더 이름
-#     )
-#     print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_results')}")
-
-# # 경로 설정
-# model_path = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16/SimCLR_YOLO_b16_model.pt'
-# test_image_dir = '/home/jovyan/test_image2'
-# output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16_test_results'
-# num_classes = 6  # 학습 시 사용된 클래스 수와 일치하도록 설정
-
-# # 모델 로드 및 테스트 실행
-# yolo_model = load_trained_model(model_path, num_classes)
-# test_model(yolo_model, test_image_dir, output_dir)
-
-
-
-# SimCLR Backbone 정의
-import torch
-import torch.nn as nn
-import os
-import shutil
-from ultralytics import YOLO
-from torchvision import models
-
-# SimCLR Backbone 정의
-class SimCLR(nn.Module):
-    def __init__(self, base_model, out_dim):
-        super(SimCLR, self).__init__()
-        self.encoder = base_model
-        self.projector = nn.Sequential(
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Linear(256, out_dim)
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
+        
+class EnhancedSTN(nn.Module):
+    def __init__(self):
+        super(EnhancedSTN, self).__init__()
+        self.localization = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=7),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.Conv2d(16, 32, kernel_size=5),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.Conv2d(32, 64, kernel_size=3),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.AdaptiveAvgPool2d((3, 3))  # 출력 크기를 3x3으로 고정
         )
+        self.fc_loc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(64 * 3 * 3, 64),
+            nn.ReLU(True),
+            nn.Linear(64, 3 * 2)
+        )
+        self.fc_loc[-1].weight.data.zero_()
+        self.fc_loc[-1].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
 
     def forward(self, x):
-        h = self.encoder(x)
-        z = self.projector(h)
-        return h, z
+        xs = self.localization(x)
+        xs = xs.view(xs.size(0), -1)  # Flatten
+        theta = self.fc_loc(xs).view(-1, 2, 3)
+        grid = F.affine_grid(theta, x.size(), align_corners=False)
+        x = F.grid_sample(x, grid, align_corners=False)
+        return x
 
-# YOLO와 SimCLR을 결합한 모델 정의
-class YOLOWithSimCLR(nn.Module):
-    def __init__(self, yolo_model, simclr):
-        super(YOLOWithSimCLR, self).__init__()
-        self.yolo = yolo_model  # YOLO 모델 구성 YAML을 사용해 초기화
-        self.simclr = simclr    # SimCLR 특징 추출기
+# STN 포함 RotNet 모델 정의
+class EnhancedRotNetWithSTN(nn.Module):
+    def __init__(self):
+        super(EnhancedRotNetWithSTN, self).__init__()
+        self.stn = EnhancedSTN()
+        
+        # ResNet Bottleneck Blocks
+        self.res_block1 = Bottleneck(1, 16)
+        self.res_block2 = Bottleneck(64, 32)
+        
+        self.pool = nn.AdaptiveAvgPool2d((4, 4))
+        self.fc1 = nn.Linear(128 * 4 * 4, 128)  # fc1을 더 크게 조정
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 64)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(64, 1)
 
     def forward(self, x):
-        _, z = self.simclr(x)   # SimCLR 특징 추출
-        return self.yolo.model(z)  # YOLO 모델로 전달하여 예측 수행
+        x = self.stn(x)
+        x = self.res_block1(x)
+        x = self.res_block2(x)
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.dropout1(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout2(x)
+        x = self.fc3(x)
+        return x
 
-    def predict(self, *args, **kwargs):
-        return self.yolo.predict(*args, **kwargs)
+# 이미지 크기 맞추기 함수
+def resize_and_pad(image, target_size=(128, 128)):
+    h, w = image.shape[:2]
+    scale = min(target_size[0] / h, target_size[1] / w)
+    new_w, new_h = int(w * scale), int(h * scale)
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
-# 모델 로드 함수
-def load_combined_model(model_path, pt_path, num_classes=6):
-    # .pt 파일을 사용하여 YOLO 모델 초기화
-    yolo_model = YOLO(pt_path)
+    pad_w = (target_size[1] - new_w) // 2
+    pad_h = (target_size[0] - new_h) // 2
+    padded_image = cv2.copyMakeBorder(resized_image, pad_h, target_size[0] - new_h - pad_h,
+                                      pad_w, target_size[1] - new_w - pad_w,
+                                      cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    return padded_image
+
+# 데이터셋 클래스 정의
+# 각도 리스트를 설정해주는 함수
+def generate_unique_rotations(num_rotations, rotation_range=(-50, 50), min_angle_diff=1.5):
+    angles = []
+    while len(angles) < num_rotations:
+        angle = random.uniform(*rotation_range)
+        if all(abs(angle - a) >= min_angle_diff for a in angles):
+            angles.append(angle)
+    return angles
+
+# 회전 함수
+def rotate_image(image, angle):
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated = cv2.warpAffine(image, M, (w, h))
+    return rotated
+
+# 밝기 조절 함수
+def adjust_brightness(image, factor):
+    return cv2.convertScaleAbs(image, alpha=factor, beta=0)
+
+# 랜덤 크롭 함수
+def random_crop(image, crop_size=(100, 100)):
+    h, w = image.shape[:2]
+    crop_h, crop_w = crop_size
+    if h > crop_h and w > crop_w:
+        top = random.randint(0, h - crop_h)
+        left = random.randint(0, w - crop_w)
+        return image[top:top + crop_h, left:left + crop_w]
+    else:
+        return image  # 크롭이 불가능하면 원본을 그대로 반환
+
+# 데이터셋 클래스에서 augment_images 함수에 적용
+class RotNetDataset(Dataset):
+    def __init__(self, folder_path, num_augmentations=1, rotation_range=(-50,50), crop_size=(100, 100), brightness_range=(0.5, 1.5)):
+        self.images = self.load_images(folder_path)
+        self.num_augmentations = num_augmentations
+        self.rotation_range = rotation_range
+        self.crop_size = crop_size
+        self.brightness_range = brightness_range
+        self.augmented_data = self.augment_images()
+
+    def load_images(self, folder_path):
+        images = []
+        for filename in os.listdir(folder_path):
+            if filename.endswith(('.png', '.jpg', '.jpeg','.JPG')):
+                image = cv2.imread(os.path.join(folder_path, filename), cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)  # 기존 resize_and_pad 함수 사용
+                images.append(image)
+        return images
+
+    def augment_images(self):
+        augmented_images = []
+        for image in self.images:
+            angles = generate_unique_rotations(self.num_augmentations, self.rotation_range, min_angle_diff=0.3)
+            for angle in angles:
+                # 1. 회전
+                rotated_image = rotate_image(image, angle)
+                
+                # 2. 밝기 조절 (0.5 ~ 1.5 배 밝기 조정)
+                brightness_factor = random.uniform(*self.brightness_range)
+                bright_image = adjust_brightness(rotated_image, brightness_factor)
+                
+                # 3. 랜덤 크롭
+                cropped_image = random_crop(bright_image, self.crop_size)
+                
+                # 최종 증강 이미지를 추가
+                augmented_images.append((cropped_image, angle))
+        return augmented_images
+
+    def __len__(self):
+        return len(self.augmented_data)
+
+    def __getitem__(self, idx):
+        image, angle = self.augmented_data[idx]
+        image = torch.tensor(image, dtype=torch.float32).unsqueeze(0) / 255.0
+        angle = torch.tensor(angle, dtype=torch.float32)
+        return image, angle
+
+# 모델 학습 함수 정의
+def train_model(model, train_loader, num_epochs=40, tolerance=1.0):
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        correct_predictions = 0
+        total_predictions = 0
+
+        for images, angles in train_loader:
+            images, angles = images.to(device), angles.to(device)
+
+            optimizer.zero_grad()
+            outputs = model(images).squeeze()
+            loss = criterion(outputs, angles)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            # Accuracy 계산
+            diff = torch.abs(outputs - angles)
+            correct_predictions += torch.sum(diff <= tolerance).item()
+            total_predictions += len(angles)
+        
+        accuracy = (correct_predictions / total_predictions) * 100
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / len(train_loader):.4f}, Accuracy: {accuracy:.2f}%")
+
+    # 모델 파라미터 저장
+    save_path_for_para = '/home/jovyan/Rotation_GEN_Para_new6_e40_a40.pth'  # 더 단순한 경로 사용
+    folder_path = os.path.dirname(save_path_for_para)
+
+# 폴더가 없으면 생성
+    os.makedirs(folder_path, exist_ok=True)
+
+# 모델 저장
+    torch.save(model.state_dict(), save_path_for_para)
+    print(f"모델이 '{save_path_for_para}'에 저장되었습니다.")
+
+# Test 및 이미지 저장 함수 정의
+def test_and_save_images(model, test_folder, save_path='test_corrected_images_new6_e40_a40_testtest'):
+    corrected_path = os.path.join(save_path, 'corrected_images')
+    rotated_path = os.path.join(save_path, 'rotated_images')
     
-    # 모델의 클래스 수를 맞춰 마지막 레이어 수정
-    yolo_model.model.model[-1] = nn.Conv2d(256, num_classes, kernel_size=1)
-    
-    # SimCLR 모델 정의
-    resnet = models.resnet50(pretrained=False)
-    resnet.fc = nn.Identity()  # fully connected layer 제거
-    simclr_model = SimCLR(base_model=resnet, out_dim=128)
-    
-    # YOLO + SimCLR 결합 모델 생성
-    model = YOLOWithSimCLR(yolo_model, simclr_model)
-    
-    # YOLOWithSimCLR 전체 가중치 로드
-    state_dict = torch.load(model_path)
-    model.load_state_dict(state_dict, strict=False)
-    
-    model.eval()  # 평가 모드 전환
-    return model
+    os.makedirs(corrected_path, exist_ok=True)
+    os.makedirs(rotated_path, exist_ok=True)
 
-# 테스트 함수
-def test_model(model, test_image_dir, output_dir, yaml_path):
-    # 출력 디렉토리 초기화
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
+    model.eval()
+    with torch.no_grad():
+        for filename in os.listdir(test_folder):
+            if filename.endswith(('.png', '.jpg', '.jpeg','.JPG')):
+                image_path = os.path.join(test_folder, filename)
+                image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)
+                image_tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 255.0
 
-    # 예측 및 결과 저장
-    results = model.predict(
-        source=test_image_dir,   # 테스트할 이미지 폴더 경로
-        save=True,               # 결과 이미지를 저장
-        project=output_dir,      # 저장할 기본 디렉토리
-        name="SimCLR_YOLO_results",
-        data=yaml_path           # 데이터셋 설정 파일 (.yaml) 경로
-    )
-    print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_results')}")
+                image_tensor = image_tensor.to(device)
 
-# 경로 설정
-dataset_yaml_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'  # 데이터셋 설정 YAML 파일 경로
-model_pt_path = '/home/jovyan/yolo11obb/yolo11m-obb.pt'         # YOLO 모델 가중치 파일 (.pt)
-combined_model_path = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16/SimCLR_YOLO_b16_model.pt'
-test_image_dir = '/home/jovyan/test_image2'
-output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16_test_results'
-num_classes = 6  # 데이터셋 클래스 수와 일치하도록 설정
+                predicted_angle = model(image_tensor).item()
 
-# 모델 로드 및 테스트 실행
-model = load_combined_model(combined_model_path, model_pt_path, num_classes)
-test_model(model, test_image_dir, output_dir, dataset_yaml_path)
+                corrected_image = rotate_image(image, -predicted_angle)
+                save_filename = os.path.join(corrected_path, f"{filename.split('.')[0]}_corrected.png")
+                cv2.imwrite(save_filename, corrected_image)
+
+                rotated_save_filename = os.path.join(rotated_path, f"{filename.split('.')[0]}_angle_{predicted_angle:.2f}.png")
+                cv2.imwrite(rotated_save_filename, image)
+                
+                print(f"{filename} - Predicted Angle: {predicted_angle:.2f}")
+
+# 데이터셋 및 모델 초기화
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+model = EnhancedRotNetWithSTN().to(device)
 
 
+train_folder = '/home/jovyan/gen_new_train_images'
+test_folder = '/home/jovyan/test_image'
+
+train_dataset = RotNetDataset(train_folder)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+
+# 모델 학습
+train_model(model, train_loader)
+
+# Test 및 결과 저장
+test_and_save_images(model, test_folder)
