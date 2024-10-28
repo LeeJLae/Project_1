@@ -33,13 +33,16 @@ class YOLOWithSimCLR(nn.Module):
         return self.yolo.model(z)  # YOLO 모델에 전달하여 예측 수행
     
     def train_yolo_with_simclr(self, data_path, output_dir, epochs_step1=50, epochs_step2=50, batch_size=16):
+        # 출력 디렉토리가 없으면 생성
+        os.makedirs(output_dir, exist_ok=True)
+        
         # Step 1 학습
         print("Starting Step 1 Training...")
         self.yolo.train(
             data=data_path,
             epochs=epochs_step1,
             imgsz=640,
-            batch=batch_size,  # 배치 크기를 줄여 메모리 사용량 감소
+            batch=batch_size,
             lr0=0.001,
             device='cuda',
             hsv_h=0.015,
@@ -47,14 +50,14 @@ class YOLOWithSimCLR(nn.Module):
             hsv_v=0.4,
             flipud=0.5,
             fliplr=0.5,
-            translate=0.05,  # 더 작은 값으로 설정
-            scale=0.4,       # 더 작은 값으로 설정
-            shear=0.1,       # 더 작은 값으로 설정
-            perspective=0.05,  # 더 작은 값으로 설정,
+            translate=0.05,
+            scale=0.4,
+            shear=0.1,
+            perspective=0.05,
             mosaic=1.0,
             mixup=0.2,
             copy_paste=0.1,
-            amp=False  # Automatic Mixed Precision 비활성화
+            amp=False
         )
         
         # Step 1 학습 완료 후 중간 모델 저장
@@ -68,7 +71,7 @@ class YOLOWithSimCLR(nn.Module):
             data=data_path,
             epochs=epochs_step2,
             imgsz=640,
-            batch=batch_size,  # 배치 크기를 줄여 메모리 사용량 감소
+            batch=batch_size,
             lr0=0.0001,  # Fine-tuning 학습률
             device='cuda',
             hsv_h=0.015,
@@ -76,10 +79,10 @@ class YOLOWithSimCLR(nn.Module):
             hsv_v=0.4,
             flipud=0.5,
             fliplr=0.5,
-            translate=0.05,  # 더 작은 값으로 설정
-            scale=0.4,       # 더 작은 값으로 설정
-            shear=0.1,       # 더 작은 값으로 설정
-            perspective=0.05,  # 더 작은 값으로 설정,
+            translate=0.05,
+            scale=0.4,
+            shear=0.1,
+            perspective=0.05,
             mosaic=1.0,
             mixup=0.2,
             copy_paste=0.1,
@@ -132,18 +135,18 @@ def test_model(model, test_image_dir, output_dir, yaml_path):
 
     # 예측 및 결과 저장
     results = model.predict(
-        source=test_image_dir,   # 테스트할 이미지 폴더 경로
-        save=True,               # 결과 이미지를 저장
-        project=output_dir,      # 저장할 기본 디렉토리
+        source=test_image_dir,
+        save=True,
+        project=output_dir,
         name="2STEP_SimCLR_YOLO_results",
-        data=yaml_path           # 데이터셋 설정 파일 (.yaml) 경로
+        data=yaml_path
     )
     print(f"Test results saved to: {os.path.join(output_dir, '2STEP_SimCLR_YOLO_results')}")
 
 # 경로 설정
 output_dir = '/home/jovyan/data-vol-1/Result/2STEP_SimCLR_YOLO_b8'
-dataset_yaml_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'  # 데이터셋 설정 YAML 파일 경로
-model_pt_path = '/home/jovyan/yolo11obb/yolo11m-obb.pt'         # YOLO 모델 가중치 파일 (.pt)
+dataset_yaml_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
+model_pt_path = '/home/jovyan/yolo11obb/yolo11m-obb.pt'
 combined_model_path = os.path.join(output_dir, '2STEP_SimCLR_YOLO_b8.pt')
 test_image_dir = '/home/jovyan/test_image2'
 num_classes = 6  # 데이터셋 클래스 수와 일치하도록 설정
@@ -151,7 +154,7 @@ num_classes = 6  # 데이터셋 클래스 수와 일치하도록 설정
 # YOLOWithSimCLR 모델 초기화
 model = initialize_yolo_with_simclr()
 
-# Step 1, Step 2 통합 학습 실행 (배치 크기 줄임)
+# Step 1, Step 2 통합 학습 실행
 model.train_yolo_with_simclr(dataset_yaml_path, output_dir, batch_size=16)
 
 # 최종 모델 저장
