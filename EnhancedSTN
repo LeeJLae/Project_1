@@ -18,7 +18,7 @@ def load_config(yaml_path):
 # 이미지 전처리 함수 (알파 채널 제거 및 1024x1024 RGB로 변환)
 def preprocess_image_for_sam(image):
     if isinstance(image, torch.Tensor):
-        return image.unsqueeze(0)  # [1, C, H, W] 형식으로 맞춤
+        return image.unsqueeze(0)
     
     if isinstance(image, np.ndarray):
         image = Image.fromarray(image)
@@ -29,7 +29,7 @@ def preprocess_image_for_sam(image):
         transforms.ToTensor()
     ])
     
-    tensor_image = transform(image).unsqueeze(0)  # [1, 3, 1024, 1024] 형식으로 맞춤
+    tensor_image = transform(image).unsqueeze(0)
     return tensor_image
 
 # Measure XML 파일에서 polygon 정보를 사용하여 마스크 생성
@@ -48,9 +48,10 @@ def measure_xml_to_mask(measure_xml_path, image_shape):
         polygon = [(int(pt.find('x').text), int(pt.find('y').text)) for pt in polygon_tag]
         cv2.fillPoly(mask, [np.array(polygon, dtype=np.int32)], 255)
     
+    cv2.imwrite(f"{os.path.splitext(measure_xml_path)[0]}_mask_debug.png", mask)
     return mask
 
-# AugmentedDataset 클래스 정의 (Data Augmentation 제외)
+# AugmentedDataset 클래스 정의
 class AugmentedDataset(Dataset):
     def __init__(self, image_dir, class_xml_dir, measure_xml_dir, resize_shape=(1024, 1024)):
         self.image_paths = [f"{image_dir}/{file}" for file in sorted(os.listdir(image_dir))]
@@ -109,6 +110,11 @@ def train_sam_with_measurement(predictor, dataloader, epochs, learning_rate=1e-4
             masks = masks.to(device)
             optimizer.zero_grad()
             
+            # 데이터 확인
+            print(f"Mask unique values: {torch.unique(masks)}")
+            print(f"Measurements: {measurements}")
+
+            # 손실 초기화
             loss_seg_total = torch.tensor(0.0, device=device, requires_grad=True)
             loss_measure_total = torch.tensor(0.0, device=device, requires_grad=True)
             
@@ -118,7 +124,10 @@ def train_sam_with_measurement(predictor, dataloader, epochs, learning_rate=1e-4
                 predictor.set_image(preprocessed_image)
                 
                 predictions, _, _ = predictor.predict(multimask_output=False)
-                
+
+                # 예측 범위 확인
+                print(f"Predictions min: {predictions.min()}, max: {predictions.max()}")
+
                 loss_seg = criterion_seg(predictions, mask.unsqueeze(0))
                 predicted_measurement = predictions.mean(dim=[1, 2, 3])
                 measurement_tensor = torch.tensor([measurement], dtype=torch.float32, requires_grad=True).to(device)
@@ -152,20 +161,20 @@ def test_sam_with_image_only(predictor, image_folder, output_folder, device='cud
             predictor.set_image(preprocessed_image)
             prediction, _, _ = predictor.predict(multimask_output=False)
             
-            # prediction을 numpy 배열로 변환 및 차원 조정
+            # 예측 결과 범위 및 크기 확인
+            print(f"Prediction min: {prediction.min()}, max: {prediction.max()}, mean: {prediction.mean()}")
+            print(f"Prediction shape: {prediction.shape}")
+            
             if isinstance(prediction, torch.Tensor):
                 prediction_image = (prediction * 255).cpu().numpy().astype(np.uint8)
             else:
                 prediction_image = (prediction * 255).astype(np.uint8)
             
-            # 차원 조정: (1024, 1024)로 조정
-            prediction_image = prediction_image.squeeze()  # 불필요한 차원 제거
+            prediction_image = prediction_image.squeeze()
             
-            # 결과 저장
             mask_output_path = os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_mask.png")
             Image.fromarray(prediction_image).save(mask_output_path)
             
-            # 측정 결과 저장
             measurement_prediction = prediction.mean()
             with open(os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_measurement.txt"), 'w') as f:
                 f.write(f"Predicted Measurement: {measurement_prediction:.4f}\n")
