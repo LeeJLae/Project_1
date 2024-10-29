@@ -1,68 +1,13 @@
-import cv2
-import numpy as np
-import os
-import math
-
-# 바운딩 박스 9개 좌표를 회전하는 함수
-def rotate_obb(x1, y1, x2, y2, x3, y3, x4, y4, angle_deg, image_shape):
-    # 각도를 라디안으로 변환
-    angle_rad = math.radians(angle_deg)
-    h, w = image_shape[:2]
-    cx, cy = w / 2, h / 2
-
-    # 네 꼭짓점 좌표를 배열로 묶음
-    corners = np.array([[x1 * w, y1 * h], [x2 * w, y2 * h], [x3 * w, y3 * h], [x4 * w, y4 * h]])
-
-    # 회전 행렬 생성
-    rotation_matrix = cv2.getRotationMatrix2D((cx, cy), angle_deg, 1.0)
-    ones = np.ones(shape=(len(corners), 1))
-    corners_homogeneous = np.hstack([corners, ones])
-
-    # 좌표 회전 적용
-    rotated_corners = rotation_matrix.dot(corners_homogeneous.T).T
-
-    # 정규화하여 [0, 1] 범위로 좌표 변환
-    rotated_corners[:, 0] /= w
-    rotated_corners[:, 1] /= h
-
-    return rotated_corners.flatten()
-
-# 데이터 증강 및 회전 적용 함수 (이미지 저장 없이 라벨만 변경)
-def augment_label_to_obb(image_path, label_path, output_folder):
-    image = cv2.imread(image_path)  # 이미지는 읽기만 함 (저장하지 않음)
-    label_file = open(label_path, 'r')
-    labels = label_file.readlines()
-    label_file.close()
-
-    for angle in np.arange(-50, 50.5, 0.5):  # -50도 ~ 50도까지 0.5도 간격으로 회전
-        # 증강된 라벨 파일 저장 경로 설정
-        filename = os.path.basename(image_path).replace('.png', f'_rot{angle}.txt')
-        augmented_label_path = os.path.join(output_folder, filename)
-
-        with open(augmented_label_path, 'w') as f:
-            for label in labels:
-                parts = list(map(float, label.strip().split()))
-                class_id = int(parts[0])
-                x1, y1, x2, y2, x3, y3, x4, y4 = parts[1:]
-
-                # 바운딩 박스를 회전하여 새로운 OBB 좌표 생성
-                rotated_corners = rotate_obb(x1, y1, x2, y2, x3, y3, x4, y4, angle, image.shape)
-                f.write(f"{class_id} " + " ".join(map(str, rotated_corners)) + '\n')
-
-# 폴더 경로로 입력 및 출력 지정
-def process_obb_conversion(input_image_folder, input_label_folder, output_label_folder):
-    os.makedirs(output_label_folder, exist_ok=True)  # 출력 폴더가 없으면 생성
-
-    for image_file in os.listdir(input_image_folder):
-        if image_file.endswith('.png'):  # PNG 파일을 대상으로 작업
-            image_path = os.path.join(input_image_folder, image_file)
-            label_path = os.path.join(input_label_folder, image_file.replace('.png', '.txt'))
-            augment_label_to_obb(image_path, label_path, output_label_folder)
-
-# 경로 설정
-input_image_folder = '/home/jovyan/data-vol-1/Y_T_image2'  # 입력 이미지 폴더 경로
-input_label_folder = '/home/jovyan/data-vol-1/Y_T_Data/forobbtxt'  # 입력 라벨 폴더 경로
-output_label_folder = '/home/jovyan/data-vol-1/dataset/train/labels'  # 변환된 OBB 라벨을 저장할 출력 폴더 경로
-
-# OBB 변환 실행
-process_obb_conversion(input_image_folder, input_label_folder, output_label_folder)
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 186, in <module>
+    main()
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 172, in main
+    train_sam_with_measurement(
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 112, in train_sam_with_measurement
+    predictor.set_image(images)
+  File "/home/jovyan/SAM_Model/segment_anything/predictor.py", line 60, in set_image
+    self.set_torch_image(input_image_torch, image.shape[:2])
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/jovyan/SAM_Model/segment_anything/predictor.py", line 82, in set_torch_image
+    and max(*transformed_image.shape[2:]) == self.model.image_encoder.img_size
