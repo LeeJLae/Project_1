@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
-import os
-import shutil
 from ultralytics import YOLO
 from torchvision import models
+import os
 
 # SimCLR Backbone 정의
 class SimCLR(nn.Module):
@@ -25,71 +24,60 @@ class SimCLR(nn.Module):
 class YOLOWithSimCLR(nn.Module):
     def __init__(self, yolo_model, simclr):
         super(YOLOWithSimCLR, self).__init__()
-        self.yolo = yolo_model  # YOLO 모델 구성 YAML을 사용해 초기화
-        self.simclr = simclr    # SimCLR 특징 추출기
+        self.yolo = yolo_model
+        self.simclr = simclr
 
     def forward(self, x):
-        _, z = self.simclr(x)   # SimCLR 특징 추출
-        return self.yolo.model(z)  # YOLO 모델로 전달하여 예측 수행
-
-    def predict(self, *args, **kwargs):
-        # 평가 모드로 전환
-        self.eval()
-        # 테스트 모드 설정
-        if 'training' in kwargs:
-            kwargs['training'] = False
-        return self.yolo.predict(*args, **kwargs)
-
-# 모델 로드 함수
-def load_combined_model(model_path, pt_path, num_classes=6):
-    # .pt 파일을 사용하여 YOLO 모델 초기화
-    yolo_model = YOLO(pt_path)
+        _, z = self.simclr(x)  # SimCLR에서 특징 추출
+        return self.yolo.model(z)  # YOLO 모델에 전달하여 예측 수행
     
-    # 모델의 클래스 수를 맞춰 마지막 레이어 수정
-    yolo_model.model.model[-1] = nn.Conv2d(256, num_classes, kernel_size=1)
-    
-    # SimCLR 모델 정의
-    resnet = models.resnet50(weights=None)
-    resnet.fc = nn.Identity()  # fully connected layer 제거
+    def train_yolo_with_simclr(self, data_path, epochs):
+        # YOLO의 train 메서드를 호출하여 학습 수행
+        self.yolo.train(
+            data=data_path,
+            epochs=epochs,
+            imgsz=640,
+            batch=16,
+            lr0=0.001,
+            device='cuda',
+            workers=4,
+            hsv_h=0.015,
+            hsv_s=0.7,
+            hsv_v=0.4,
+            flipud=0.5,
+            fliplr=0.5,
+            translate=0.1,
+            scale=0.5,
+            shear=0.2,
+            perspective=0.1,
+            mosaic=1.0,
+            mixup=0.2,
+            copy_paste=0.1,
+            amp=False
+        )
+
+# YOLO 및 SimCLR 초기화 함수
+def initialize_yolo_with_simclr():
+    yolo_model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
+    resnet_weights_path = '/home/jovyan/resnet_pretrain/resnet50.pth'
+    resnet = models.resnet50(pretrained=False)
+    resnet.load_state_dict(torch.load(resnet_weights_path))
+    resnet.fc = nn.Identity()
     simclr_model = SimCLR(base_model=resnet, out_dim=128)
-    
-    # YOLO + SimCLR 결합 모델 생성
-    model = YOLOWithSimCLR(yolo_model, simclr_model)
-    
-    # YOLOWithSimCLR 전체 가중치 로드
-    state_dict = torch.load(model_path)
-    model.load_state_dict(state_dict, strict=False)
-    
-    model.eval()  # 평가 모드 전환
-    return model
+    combined_model = YOLOWithSimCLR(yolo_model, simclr_model)
+    return combined_model
 
-# 테스트 함수
-def test_model(model, test_image_dir, output_dir, yaml_path):
-    # 출력 디렉토리 초기화
-    if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
+# 학습 실행 및 모델 저장
+output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16'
+os.makedirs(output_dir, exist_ok=True)
 
-    # 예측 및 결과 저장
-    results = model.predict(
-        source=test_image_dir,   # 테스트할 이미지 폴더 경로
-        save=True,               # 결과 이미지를 저장
-        project=output_dir,      # 저장할 기본 디렉토리
-        name="SimCLR_YOLO_results",
-        data=yaml_path,          # 데이터셋 설정 파일 (.yaml) 경로
-        training=False,
-        amp=False           # 확실히 테스트 모드로 설정
-    )
-    print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_results')}")
+# YOLOWithSimCLR 모델 초기화
+model = initialize_yolo_with_simclr()
 
-# 경로 설정
-dataset_yaml_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'  # 데이터셋 설정 YAML 파일 경로
-model_pt_path = '/home/jovyan/yolo11obb/yolo11m-obb.pt'         # YOLO 모델 가중치 파일 (.pt)
-combined_model_path = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b8/SimCLR_YOLO_b8_model.pt'
-test_image_dir = '/home/jovyan/data-vol-1/trashcan/test_image2'
-output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b8_test_results'
-num_classes = 6  # 데이터셋 클래스 수와 일치하도록 설정
+# 통합 학습 실행
+data_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
+model.train_yolo_with_simclr(data_path, epochs=50)
 
-# 모델 로드 및 테스트 실행
-model = load_combined_model(combined_model_path, model_pt_path, num_classes)
-test_model(model, test_image_dir, output_dir, dataset_yaml_path)
+# 학습 완료 후 모델 저장
+model_save_path = os.path.join(output_dir, 'SimCLR_YOLO_b16_model.pt')
+torch.save(model.state_dict(), model_save_path)
