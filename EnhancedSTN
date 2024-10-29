@@ -32,9 +32,9 @@ def preprocess_image_for_sam(image):
     tensor_image = transform(image).unsqueeze(0)
     return tensor_image
 
-# Measure XML 파일에서 polygon 정보를 사용하여 마스크 생성
-def measure_xml_to_mask(measure_xml_path, image_shape):
-    tree = ET.parse(measure_xml_path)
+# Class XML 파일에서 polygon 정보를 사용하여 마스크 생성
+def class_xml_to_mask(class_xml_path, image_shape):
+    tree = ET.parse(class_xml_path)
     root = tree.getroot()
     mask = np.zeros(image_shape[:2], dtype=np.uint8)
     
@@ -42,13 +42,21 @@ def measure_xml_to_mask(measure_xml_path, image_shape):
         polygon_tag = obj.find('polygon')
         
         if polygon_tag is None:
-            print(f"Warning: 'polygon' tag not found in {measure_xml_path}")
+            print(f"Warning: 'polygon' tag not found in {class_xml_path}")
             continue
         
+        # polygon 좌표 확인 및 변환
         polygon = [(int(pt.find('x').text), int(pt.find('y').text)) for pt in polygon_tag]
-        cv2.fillPoly(mask, [np.array(polygon, dtype=np.int32)], 255)
-    
-    cv2.imwrite(f"{os.path.splitext(measure_xml_path)[0]}_mask_debug.png", mask)
+        print(f"Polygon coordinates: {polygon}")  # 좌표 확인
+
+        # polygon이 유효한 경우에만 fillPoly 적용
+        if polygon:
+            polygon_array = np.array([polygon], dtype=np.int32)
+            cv2.fillPoly(mask, polygon_array, 255)
+        else:
+            print(f"Warning: No valid polygon coordinates in {class_xml_path}")
+
+    cv2.imwrite(f"{os.path.splitext(class_xml_path)[0]}_mask_debug.png", mask)
     return mask
 
 # AugmentedDataset 클래스 정의
@@ -69,7 +77,7 @@ class AugmentedDataset(Dataset):
     def __getitem__(self, idx):
         image = self.load_image(self.image_paths[idx])
         image = self.transform(image)
-        measure_mask = measure_xml_to_mask(self.measure_xml_paths[idx], (1024, 1024))
+        measure_mask = class_xml_to_mask(self.class_xml_paths[idx], (1024, 1024))
         measure_mask = torch.tensor(measure_mask, dtype=torch.float32) / 255.0
         measurement = self.parse_measurement_xml(self.measure_xml_paths[idx])
         
@@ -175,6 +183,7 @@ def test_sam_with_image_only(predictor, image_folder, output_folder, device='cud
             mask_output_path = os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_mask.png")
             Image.fromarray(prediction_image).save(mask_output_path)
             
+            # 측정 결과 저장
             measurement_prediction = prediction.mean()
             with open(os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_measurement.txt"), 'w') as f:
                 f.write(f"Predicted Measurement: {measurement_prediction:.4f}\n")
