@@ -1,68 +1,94 @@
+import os
 import cv2
 import numpy as np
-import os
-import math
 
-# 바운딩 박스 9개 좌표를 회전하는 함수
-def rotate_obb(x1, y1, x2, y2, x3, y3, x4, y4, angle_deg, image_shape):
-    # 각도를 라디안으로 변환
-    angle_rad = math.radians(angle_deg)
-    h, w = image_shape[:2]
-    cx, cy = w / 2, h / 2
+# YOLO 형식을 9개 좌표 형식으로 변환
+def yolo_to_obb(x_center, y_center, width, height, image_width, image_height):
+    # 이미지 크기를 기준으로 실제 좌표 계산
+    w = width * image_width
+    h = height * image_height
+    x_center *= image_width
+    y_center *= image_height
+    
+    # 4개의 꼭짓점 좌표 계산 (좌상단, 우상단, 우하단, 좌하단)
+    x1, y1 = x_center - w / 2, y_center - h / 2
+    x2, y2 = x_center + w / 2, y_center - h / 2
+    x3, y3 = x_center + w / 2, y_center + h / 2
+    x4, y4 = x_center - w / 2, y_center + h / 2
+    
+    return [x1, y1, x2, y2, x3, y3, x4, y4]
 
-    # 네 꼭짓점 좌표를 배열로 묶음
-    corners = np.array([[x1 * w, y1 * h], [x2 * w, y2 * h], [x3 * w, y3 * h], [x4 * w, y4 * h]])
+# 바운딩 박스를 그려서 이미지에 저장하는 함수
+def draw_bboxes(image, bboxes, output_image_path):
+    for bbox in bboxes:
+        class_id, x1, y1, x2, y2, x3, y3, x4, y4 = bbox
+        
+        # 4개의 꼭짓점을 사용해 바운딩 박스 그리기
+        points = [(int(x1), int(y1)), (int(x2), int(y2)), (int(x3), int(y3)), (int(x4), int(y4))]
+        
+        # 폴리곤 형태로 그리기 (초록색, 두께 2)
+        cv2.polylines(image, [np.array(points)], isClosed=True, color=(0, 255, 0), thickness=2)
+    
+    # 결과 이미지를 저장
+    cv2.imwrite(output_image_path, image)
+    print(f"Image saved at {output_image_path}")
 
-    # 회전 행렬 생성
-    rotation_matrix = cv2.getRotationMatrix2D((cx, cy), angle_deg, 1.0)
-    ones = np.ones(shape=(len(corners), 1))
-    corners_homogeneous = np.hstack([corners, ones])
+# TXT 파일에 변환된 좌표를 저장하는 함수
+def save_transformed_bboxes_to_txt(bboxes, image_shape, output_txt_path):
+    h, w, _ = image_shape
+    with open(output_txt_path, 'w') as f:
+        for bbox in bboxes:
+            class_id, x_center, y_center, width, height = bbox
+            obb_coords = yolo_to_obb(x_center, y_center, width, height, w, h)
+            f.write(f"{class_id} {obb_coords[0]} {obb_coords[1]} {obb_coords[2]} {obb_coords[3]} {obb_coords[4]} {obb_coords[5]} {obb_coords[6]} {obb_coords[7]}\n")
+    print(f"TXT file saved at {output_txt_path}")
 
-    # 좌표 회전 적용
-    rotated_corners = rotation_matrix.dot(corners_homogeneous.T).T
+# 이미지 및 TXT 파일 경로 설정
+def process_image_with_bboxes(image_path, txt_path, output_image_dir, output_txt_dir):
+    # 이미지 불러오기
+    image = cv2.imread(image_path)
+    bboxes = []
+    
+    # TXT 파일에서 바운딩 박스 좌표 읽기
+    with open(txt_path, 'r') as f:
+        for line in f:
+            values = list(map(float, line.strip().split()))
+            bboxes.append(values)
+    
+    # 변환된 좌표를 새로운 TXT 파일로 저장
+    output_txt_path = os.path.join(output_txt_dir, os.path.basename(txt_path))
+    save_transformed_bboxes_to_txt(bboxes, image.shape, output_txt_path)
 
-    # 정규화하여 [0, 1] 범위로 좌표 변환
-    rotated_corners[:, 0] /= w
-    rotated_corners[:, 1] /= h
+    # 변환된 좌표를 사용하여 이미지에 바운딩 박스를 그리고 저장
+    output_image_path = os.path.join(output_image_dir, os.path.basename(image_path))
+    obb_bboxes = []
+    h, w, _ = image.shape
+    for bbox in bboxes:
+        class_id, x_center, y_center, width, height = bbox
+        obb_coords = yolo_to_obb(x_center, y_center, width, height, w, h)
+        obb_bboxes.append([class_id] + obb_coords)
+    
+    draw_bboxes(image, obb_bboxes, output_image_path)
 
-    return rotated_corners.flatten()
+# 이미지 및 TXT 파일을 처리
+def process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir):
+    os.makedirs(output_image_dir, exist_ok=True)
+    os.makedirs(output_txt_dir, exist_ok=True)
+    
+    # 모든 이미지와 TXT 파일 처리
+    for image_file in os.listdir(image_dir):
+        if image_file.endswith('.png') or image_file.endswith('.jpg'):  # 이미지 파일 확장자 확인
+            image_path = os.path.join(image_dir, image_file)
+            txt_path = os.path.join(txt_dir, image_file.replace('.png', '.txt').replace('.jpg', '.txt'))
+            
+            if os.path.exists(txt_path):
+                process_image_with_bboxes(image_path, txt_path, output_image_dir, output_txt_dir)
 
-# 데이터 증강 및 회전 적용 함수 (이미지 저장 없이 라벨만 변경)
-def augment_label_to_obb(image_path, label_path, output_folder):
-    image = cv2.imread(image_path)  # 이미지는 읽기만 함 (저장하지 않음)
-    label_file = open(label_path, 'r')
-    labels = label_file.readlines()
-    label_file.close()
+# 경로 설정 (이미지, TXT 파일, 결과 저장 경로)
+image_dir = '/home/jovyan/data-vol-1/dataset/train/images'
+txt_dir = '/home/jovyan/data-vol-1/dataset/train/labels'
+output_image_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/images'
+output_txt_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/labels'
 
-    for angle in np.arange(-50, 50.5, 0.5):  # -50도 ~ 50도까지 0.5도 간격으로 회전
-        # 증강된 라벨 파일 저장 경로 설정
-        filename = os.path.basename(image_path).replace('.png', f'_rot{angle}.txt')
-        augmented_label_path = os.path.join(output_folder, filename)
-
-        with open(augmented_label_path, 'w') as f:
-            for label in labels:
-                parts = list(map(float, label.strip().split()))
-                class_id = int(parts[0])
-                x1, y1, x2, y2, x3, y3, x4, y4 = parts[1:]
-
-                # 바운딩 박스를 회전하여 새로운 OBB 좌표 생성
-                rotated_corners = rotate_obb(x1, y1, x2, y2, x3, y3, x4, y4, angle, image.shape)
-                f.write(f"{class_id} " + " ".join(map(str, rotated_corners)) + '\n')
-
-# 폴더 경로로 입력 및 출력 지정
-def process_obb_conversion(input_image_folder, input_label_folder, output_label_folder):
-    os.makedirs(output_label_folder, exist_ok=True)  # 출력 폴더가 없으면 생성
-
-    for image_file in os.listdir(input_image_folder):
-        if image_file.endswith('.png'):  # PNG 파일을 대상으로 작업
-            image_path = os.path.join(input_image_folder, image_file)
-            label_path = os.path.join(input_label_folder, image_file.replace('.png', '.txt'))
-            augment_label_to_obb(image_path, label_path, output_label_folder)
-
-# 경로 설정
-input_image_folder = '/home/jovyan/data-vol-1/Y_T_image2'  # 입력 이미지 폴더 경로
-input_label_folder = '/home/jovyan/data-vol-1/Y_T_Data/forobbtxt'  # 입력 라벨 폴더 경로
-output_label_folder = '/home/jovyan/data-vol-1/dataset/train/labels'  # 변환된 OBB 라벨을 저장할 출력 폴더 경로
-
-# OBB 변환 실행
-process_obb_conversion(input_image_folder, input_label_folder, output_label_folder)
+# 이미지와 바운딩 박스를 그린 결과 이미지 및 변환된 TXT 파일 저장
+process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir)
