@@ -1,14 +1,17 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 189, in <module>
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 2928, in fromarray
+    mode, rawmode = _fromarray_typemap[typekey]
+KeyError: ((1, 1, 1024), '|u1')
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 194, in <module>
     main()
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 186, in main
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 191, in main
     test_sam_with_image_only(predictor, test_image_folder, output_folder, device='cuda')
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 152, in test_sam_with_image_only
-    predictor.set_image(preprocessed_image)
-  File "/home/jovyan/SAM_Model/segment_anything/predictor.py", line 56, in set_image
-    input_image = self.transform.apply_image(image)
-  File "/home/jovyan/SAM_Model/segment_anything/utils/transforms.py", line 31, in apply_image
-    return np.array(resize(to_pil_image(image), target_size))
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/transforms/functional.py", line 274, in to_pil_image
-    raise ValueError(f"pic should be 2/3 dimensional. Got {pic.ndim} dimensions.")
-ValueError: pic should be 2/3 dimensional. Got 4 dimensions.
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 163, in test_sam_with_image_only
+    Image.fromarray(prediction_image).save(mask_output_path)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 2930, in fromarray
+    raise TypeError("Cannot handle this data type: %s, %s" % typekey) from e
+TypeError: Cannot handle this data type: (1, 1, 1024), |u1
