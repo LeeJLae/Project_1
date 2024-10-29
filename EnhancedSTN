@@ -1,9 +1,9 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 203, in <module>
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 189, in <module>
     main()
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 200, in main
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 186, in main
     test_sam_with_image_only(predictor, test_image_folder, output_folder, device='cuda')
-  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug.py", line 161, in test_sam_with_image_only
+  File "/home/jovyan/jonglae/Retry1/Segmentation/SAM_NoDataAug2.py", line 152, in test_sam_with_image_only
     predictor.set_image(preprocessed_image)
   File "/home/jovyan/SAM_Model/segment_anything/predictor.py", line 56, in set_image
     input_image = self.transform.apply_image(image)
@@ -11,4 +11,4 @@ Traceback (most recent call last):
     return np.array(resize(to_pil_image(image), target_size))
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/transforms/functional.py", line 274, in to_pil_image
     raise ValueError(f"pic should be 2/3 dimensional. Got {pic.ndim} dimensions.")
-ValueError: pic should be 2/3 dimensional. Got 4 dimensions
+ValueError: pic should be 2/3 dimensional. Got 4 dimensions.
