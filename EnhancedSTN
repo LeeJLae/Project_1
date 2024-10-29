@@ -1,90 +1,6 @@
 import torch
 import torch.nn as nn
 import os
-from ultralytics import YOLO
-from torchvision import models
-import shutil
-
-# # SimCLR Backbone 정의 (학습 시 정의된 것과 동일해야 함)
-# class SimCLR(nn.Module):
-#     def __init__(self, base_model, out_dim):
-#         super(SimCLR, self).__init__()
-#         self.encoder = base_model
-#         self.projector = nn.Sequential(
-#             nn.Linear(512, 256),
-#             nn.ReLU(),
-#             nn.Linear(256, out_dim)
-#         )
-
-#     def forward(self, x):
-#         h = self.encoder(x)
-#         z = self.projector(h)
-#         return h, z
-
-# # YOLO와 SimCLR을 결합한 모델 정의
-# class YOLOWithSimCLR(nn.Module):
-#     def __init__(self, yolo_model, simclr):
-#         super(YOLOWithSimCLR, self).__init__()
-#         self.yolo = yolo_model
-#         self.simclr = simclr
-
-#     def forward(self, x):
-#         _, z = self.simclr(x)  # SimCLR에서 특징 추출
-#         return self.yolo.model(z)  # YOLO 모델에 전달하여 예측 수행
-    
-#     def predict(self, *args, **kwargs):
-#         return self.yolo.predict(*args, **kwargs)
-
-# # 모델 로드 함수
-# def load_trained_model(model_path, num_classes):
-#     # YOLO 모델 초기화
-#     yolo_model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
-    
-#     # 현재 모델 구조의 마지막 레이어를 학습된 모델에 맞게 수정
-#     yolo_model.model.model[-1] = nn.Conv2d(256, num_classes, kernel_size=1)  # 마지막 레이어 재설정
-    
-#     # 가중치 로드 (마지막 레이어 제외)
-#     state_dict = torch.load(model_path)
-#     model_state_dict = yolo_model.model.state_dict()
-#     for name, param in state_dict.items():
-#         if name in model_state_dict and param.shape == model_state_dict[name].shape:
-#             model_state_dict[name].copy_(param)
-    
-#     yolo_model.eval()  # 모델을 평가 모드로 전환
-#     return yolo_model
-
-# # 테스트 함수
-# def test_model(model, test_image_dir, output_dir):
-#     # 출력 디렉토리 초기화
-#     if os.path.exists(output_dir):
-#         shutil.rmtree(output_dir)
-#     os.makedirs(output_dir, exist_ok=True)
-
-#     # 예측 및 결과 저장
-#     results = model.predict(
-#         source=test_image_dir,   # 테스트할 이미지 폴더 경로
-#         save=True,               # 결과 이미지를 저장
-#         project=output_dir,      # 저장할 기본 디렉토리
-#         name="SimCLR_YOLO_results"  # 결과를 저장할 하위 폴더 이름
-#     )
-#     print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_results')}")
-
-# # 경로 설정
-# model_path = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16/SimCLR_YOLO_b16_model.pt'
-# test_image_dir = '/home/jovyan/test_image2'
-# output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b16_test_results'
-# num_classes = 6  # 학습 시 사용된 클래스 수와 일치하도록 설정
-
-# # 모델 로드 및 테스트 실행
-# yolo_model = load_trained_model(model_path, num_classes)
-# test_model(yolo_model, test_image_dir, output_dir)
-
-
-
-# SimCLR Backbone 정의
-import torch
-import torch.nn as nn
-import os
 import shutil
 from ultralytics import YOLO
 from torchvision import models
@@ -117,6 +33,11 @@ class YOLOWithSimCLR(nn.Module):
         return self.yolo.model(z)  # YOLO 모델로 전달하여 예측 수행
 
     def predict(self, *args, **kwargs):
+        # 평가 모드로 전환
+        self.eval()
+        # 테스트 모드 설정
+        if 'training' in kwargs:
+            kwargs['training'] = False
         return self.yolo.predict(*args, **kwargs)
 
 # 모델 로드 함수
@@ -128,7 +49,7 @@ def load_combined_model(model_path, pt_path, num_classes=6):
     yolo_model.model.model[-1] = nn.Conv2d(256, num_classes, kernel_size=1)
     
     # SimCLR 모델 정의
-    resnet = models.resnet50(pretrained=False)
+    resnet = models.resnet50(weights=None)
     resnet.fc = nn.Identity()  # fully connected layer 제거
     simclr_model = SimCLR(base_model=resnet, out_dim=128)
     
@@ -155,7 +76,9 @@ def test_model(model, test_image_dir, output_dir, yaml_path):
         save=True,               # 결과 이미지를 저장
         project=output_dir,      # 저장할 기본 디렉토리
         name="SimCLR_YOLO_results",
-        data=yaml_path           # 데이터셋 설정 파일 (.yaml) 경로
+        data=yaml_path,          # 데이터셋 설정 파일 (.yaml) 경로
+        training=False,
+        amp=False           # 확실히 테스트 모드로 설정
     )
     print(f"Test results saved to: {os.path.join(output_dir, 'SimCLR_YOLO_results')}")
 
@@ -163,12 +86,10 @@ def test_model(model, test_image_dir, output_dir, yaml_path):
 dataset_yaml_path = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'  # 데이터셋 설정 YAML 파일 경로
 model_pt_path = '/home/jovyan/yolo11obb/yolo11m-obb.pt'         # YOLO 모델 가중치 파일 (.pt)
 combined_model_path = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b8/SimCLR_YOLO_b8_model.pt'
-test_image_dir = '/home/jovyan/test_image2'
+test_image_dir = '/home/jovyan/data-vol-1/trashcan/test_image2'
 output_dir = '/home/jovyan/data-vol-1/Result/SimCLR_YOLO_b8_test_results'
 num_classes = 6  # 데이터셋 클래스 수와 일치하도록 설정
 
 # 모델 로드 및 테스트 실행
 model = load_combined_model(combined_model_path, model_pt_path, num_classes)
 test_model(model, test_image_dir, output_dir, dataset_yaml_path)
-
-
