@@ -1,50 +1,28 @@
 import os
 import cv2
 import numpy as np
+import random
 
-# YOLO 형식을 9개 좌표 형식으로 변환
-def yolo_to_obb(x_center, y_center, width, height, image_width, image_height):
-    # 이미지 크기를 기준으로 실제 좌표 계산
-    w = width * image_width
-    h = height * image_height
-    x_center *= image_width
-    y_center *= image_height
+# 바운딩 박스를 회전 및 크기 변경에 맞게 변환하는 함수
+def rotate_bbox(bbox, angle, original_shape, new_shape, scale_factor):
+    orig_h, orig_w = original_shape[:2]
+    new_h, new_w = new_shape[:2]
     
-    # 4개의 꼭짓점 좌표 계산 (좌상단, 우상단, 우하단, 좌하단)
-    x1, y1 = x_center - w / 2, y_center - h / 2
-    x2, y2 = x_center + w / 2, y_center - h / 2
-    x3, y3 = x_center + w / 2, y_center + h / 2
-    x4, y4 = x_center - w / 2, y_center + h / 2
+    # 바운딩 박스 좌표를 이미지의 중앙을 기준으로 변환
+    points = np.array([[bbox[0], bbox[1]], [bbox[2], bbox[3]], [bbox[4], bbox[5]], [bbox[6], bbox[7]]])
+    points[:, 0] = points[:, 0] + (new_w - orig_w) / 2  # x좌표 이동
+    points[:, 1] = points[:, 1] + (new_h - orig_h) / 2  # y좌표 이동
     
-    return [x1, y1, x2, y2, x3, y3, x4, y4]
-
-# 바운딩 박스를 그려서 이미지에 저장하는 함수
-def draw_bboxes(image, bboxes, output_image_path):
-    for bbox in bboxes:
-        class_id, x1, y1, x2, y2, x3, y3, x4, y4 = bbox
-        
-        # 4개의 꼭짓점을 사용해 바운딩 박스 그리기
-        points = [(int(x1), int(y1)), (int(x2), int(y2)), (int(x3), int(y3)), (int(x4), int(y4))]
-        
-        # 폴리곤 형태로 그리기 (초록색, 두께 2)
-        cv2.polylines(image, [np.array(points)], isClosed=True, color=(0, 255, 0), thickness=2)
+    # 이미지의 중심점 기준으로 회전 변환
+    center = (new_w / 2, new_h / 2)
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
     
-    # 결과 이미지를 저장
-    cv2.imwrite(output_image_path, image)
-    print(f"Image saved at {output_image_path}")
+    # 좌표 회전
+    rotated_points = cv2.transform(np.array([points]), rotation_matrix)[0]
+    return rotated_points.flatten().tolist()
 
-# TXT 파일에 변환된 좌표를 저장하는 함수
-def save_transformed_bboxes_to_txt(bboxes, image_shape, output_txt_path):
-    h, w, _ = image_shape
-    with open(output_txt_path, 'w') as f:
-        for bbox in bboxes:
-            class_id, x_center, y_center, width, height = bbox
-            obb_coords = yolo_to_obb(x_center, y_center, width, height, w, h)
-            f.write(f"{class_id} {obb_coords[0]} {obb_coords[1]} {obb_coords[2]} {obb_coords[3]} {obb_coords[4]} {obb_coords[5]} {obb_coords[6]} {obb_coords[7]}\n")
-    print(f"TXT file saved at {output_txt_path}")
-
-# 이미지 및 TXT 파일 경로 설정
-def process_image_with_bboxes(image_path, txt_path, output_image_dir, output_txt_dir):
+# 이미지 및 바운딩 박스 회전 후 저장하는 함수
+def augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees=(-50, 50), scale_factor=1.5):
     # 이미지 불러오기
     image = cv2.imread(image_path)
     bboxes = []
@@ -55,40 +33,100 @@ def process_image_with_bboxes(image_path, txt_path, output_image_dir, output_txt
             values = list(map(float, line.strip().split()))
             bboxes.append(values)
     
-    # 변환된 좌표를 새로운 TXT 파일로 저장
-    output_txt_path = os.path.join(output_txt_dir, os.path.basename(txt_path))
-    save_transformed_bboxes_to_txt(bboxes, image.shape, output_txt_path)
-
-    # 변환된 좌표를 사용하여 이미지에 바운딩 박스를 그리고 저장
-    output_image_path = os.path.join(output_image_dir, os.path.basename(image_path))
-    obb_bboxes = []
-    h, w, _ = image.shape
-    for bbox in bboxes:
-        class_id, x_center, y_center, width, height = bbox
-        obb_coords = yolo_to_obb(x_center, y_center, width, height, w, h)
-        obb_bboxes.append([class_id] + obb_coords)
+    orig_h, orig_w, _ = image.shape
     
-    draw_bboxes(image, obb_bboxes, output_image_path)
+    # 이미지 크기 확대 (물체가 이미지 밖으로 벗어나지 않도록)
+    new_w, new_h = int(orig_w * scale_factor), int(orig_h * scale_factor)
+    padded_image = np.zeros((new_h, new_w, 3), dtype=np.uint8)
+    
+    # 이미지 중앙 배치
+    x_offset = (new_w - orig_w) // 2
+    y_offset = (new_h - orig_h) // 2
+    padded_image[y_offset:y_offset+orig_h, x_offset:x_offset+orig_w] = image
+    
+    augmented_images = []
+    
+    # 각도별로 이미지와 바운딩 박스 회전
+    for degree in range(degrees[0], degrees[1] + 1):
+        # 이미지 회전
+        rotation_matrix = cv2.getRotationMatrix2D((new_w / 2, new_h / 2), degree, 1.0)
+        rotated_image = cv2.warpAffine(padded_image, rotation_matrix, (new_w, new_h))
+        
+        # 동일한 이름을 가진 이미지와 TXT 파일 저장
+        filename = f"{os.path.splitext(os.path.basename(image_path))[0]}_rot{degree}"
+        rotated_image_path = os.path.join(output_image_dir, f"{filename}.png")
+        output_txt_path = os.path.join(output_txt_dir, f"{filename}.txt")
+        
+        # 변환된 이미지 저장
+        cv2.imwrite(rotated_image_path, rotated_image)
+        
+        # 바운딩 박스 회전 및 저장
+        with open(output_txt_path, 'w') as f:
+            rotated_bboxes = []
+            for bbox in bboxes:
+                class_id = bbox[0]
+                obb_coords = bbox[1:]  # x1, y1, x2, y2, x3, y3, x4, y4
+                rotated_obb_coords = rotate_bbox(obb_coords, degree, image.shape, padded_image.shape, scale_factor)
+                rotated_bboxes.append([class_id] + rotated_obb_coords)
+                f.write(f"{class_id} {' '.join(map(str, rotated_obb_coords))}\n")
+        
+        # 증강된 이미지 목록에 추가
+        augmented_images.append((rotated_image_path, rotated_bboxes))
+    
+    return augmented_images
 
-# 이미지 및 TXT 파일을 처리
-def process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir):
+# 무작위로 10개의 이미지를 선택하여 바운딩 박스를 그린 후 저장
+def save_random_bbox_images(augmented_images, output_bbox_image_dir):
+    os.makedirs(output_bbox_image_dir, exist_ok=True)
+    
+    # 무작위로 10개의 증강된 이미지 선택
+    random_images = random.sample(augmented_images, 10)
+    
+    for image_path, bboxes in random_images:
+        image = cv2.imread(image_path)
+        output_image_path = os.path.join(output_bbox_image_dir, os.path.basename(image_path))
+        draw_bboxes(image, bboxes, output_image_path)
+
+# 바운딩 박스를 이미지에 그리는 함수
+def draw_bboxes(image, bboxes, output_image_path):
+    for bbox in bboxes:
+        class_id, x1, y1, x2, y2, x3, y3, x4, y4 = bbox
+        
+        # 4개의 꼭짓점을 사용해 바운딩 박스 그리기
+        points = [(int(x1), int(y1)), (int(x2), int(y2)), (int(x3), int(y3)), (int(x4), int(y4))]
+        
+        # 폴리곤 형태로 그리기 (초록색, 두께 2)
+        cv2.polylines(image, [np.array(points)], isClosed=True, color=(0, 255, 0), thickness=2)
+    
+    # 바운딩 박스가 그려진 이미지 저장
+    cv2.imwrite(output_image_path, image)
+    print(f"Saved image with B-box: {output_image_path}")
+
+# 모든 이미지 및 TXT 파일에 대해 증강
+def process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, output_bbox_image_dir, degrees=(-50, 50), scale_factor=1.5):
     os.makedirs(output_image_dir, exist_ok=True)
     os.makedirs(output_txt_dir, exist_ok=True)
     
-    # 모든 이미지와 TXT 파일 처리
+    all_augmented_images = []
+    
     for image_file in os.listdir(image_dir):
-        if image_file.endswith('.png') or image_file.endswith('.jpg'):  # 이미지 파일 확장자 확인
+        if image_file.endswith('.png') or image_file.endswith('.jpg'):
             image_path = os.path.join(image_dir, image_file)
             txt_path = os.path.join(txt_dir, image_file.replace('.png', '.txt').replace('.jpg', '.txt'))
             
             if os.path.exists(txt_path):
-                process_image_with_bboxes(image_path, txt_path, output_image_dir, output_txt_dir)
+                augmented_images = augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees, scale_factor)
+                all_augmented_images.extend(augmented_images)
+    
+    # 무작위로 10개의 이미지를 선택하여 바운딩 박스 그리기
+    save_random_bbox_images(all_augmented_images, output_bbox_image_dir)
 
-# 경로 설정 (이미지, TXT 파일, 결과 저장 경로)
-image_dir = '/home/jovyan/data-vol-1/dataset/train/images'
-txt_dir = '/home/jovyan/data-vol-1/dataset/train/labels'
-output_image_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/images'
-output_txt_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/labels'
+# 경로 설정
+image_dir = '/home/jovyan/data-vol-1/dataset/origin/images'  # 원본 이미지 경로
+txt_dir = '/home/jovyan/data-vol-1/dataset/origin/labels'  # 9개 좌표 형식의 TXT 파일 경로
+output_image_dir = '/home/jovyan/data-vol-1/2nd/dataset/train/images'  # 증강된 이미지 저장 경로
+output_txt_dir = '/home/jovyan/data-vol-1/2nd/dataset/train/labels'  # 증강된 TXT 파일 저장 경로
+output_bbox_image_dir = '/home/jovyan/data-vol-1/Y_T_Data/check2/check3/check4/check5/check6/checklast'  # 바운딩 박스가 그려진 이미지 저장 경로
 
-# 이미지와 바운딩 박스를 그린 결과 이미지 및 변환된 TXT 파일 저장
-process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir)
+# -50도 ~ 50도 범위로 증강 실행
+process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, output_bbox_image_dir, degrees=(-50, 50), scale_factor=1.5)
