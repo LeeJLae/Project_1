@@ -8,14 +8,65 @@ model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Result/TEST1_yolov11m'
+output_dir = '/home/jovyan/data-vol-1/Result/TEST2_2step_yolov11m'
 os.makedirs(output_dir, exist_ok=True)
 
-# 학습 실행 (검증 데이터 사용 안 함)
-model.train(data=train_data, epochs=50, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, val=False)
+# 1단계 학습 (lr=0.001, 50 epochs)
+model.train(
+    data=train_data,
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    lr0=0.001,          # 첫 번째 학습률
+    device='cuda',
+    amp=False,
+    patience=40,
+    val=False,
+    hsv_h=0.015,        # 색상 조정
+    hsv_s=0.7,          # 채도 조정
+    hsv_v=0.4,          # 밝기 조정
+    flipud=0.5,         # 수직 반전
+    fliplr=0.5,         # 수평 반전
+    translate=0.1,      # 평행 이동
+    scale=0.5,          # 크기 조정
+    shear=0.2,          # 기울이기
+    perspective=0.1,    # 투시 왜곡
+    mosaic=1.0,         # 모자이크 증강
+    copy_paste=1.0      # Copy-Paste 증강
+)
 
-# 학습된 모델 저장
-model.save(os.path.join(output_dir, 'TEST5_yolov11m.pt'))
+# 1단계 학습된 모델 저장
+model_save_path = os.path.join(output_dir, 'TEST2_1st.pt')
+model.save(model_save_path)
+
+# 1단계 학습된 파라미터를 불러오기
+model = YOLO(model_save_path)  # 첫 번째 학습 결과를 불러와서 모델 초기화
+
+# 2단계 학습 (lr=0.0001, 50 epochs, 1단계 학습 파라미터 유지)
+model.train(
+    data=train_data,
+    epochs=50,
+    imgsz=640,
+    batch=16,
+    lr0=0.0001,         # 두 번째 학습률
+    device='cuda',
+    amp=False,
+    val=False,
+    hsv_h=0.015,        # 동일한 데이터 증강 파라미터 사용
+    hsv_s=0.7,          # 채도 조정
+    hsv_v=0.4,          # 밝기 조정
+    flipud=0.5,         # 수직 반전
+    fliplr=0.5,         # 수평 반전
+    translate=0.1,      # 평행 이동
+    scale=0.5,          # 크기 조정
+    shear=0.2,          # 기울이기
+    perspective=0.1,    # 투시 왜곡
+    mosaic=1.0,         # 모자이크 증강
+    copy_paste=1.0      # Copy-Paste 증강
+)
+
+# 2단계 학습된 모델 저장
+model.save(os.path.join(output_dir, 'TEST2_2nd.pt'))
 
 # 테스트 이미지 경로 설정
 test_image_dir = '/home/jovyan/data-vol-1/trashcan/test_image2'
