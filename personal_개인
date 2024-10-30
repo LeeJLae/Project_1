@@ -9,12 +9,11 @@ model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Result/TEST1_yolov11m'
+output_dir = '/home/jovyan/data-vol-1/Result/TEST2_2step_yolov11m'
 os.makedirs(output_dir, exist_ok=True)
 
 # IoU 계산 함수
 def calculate_iou(box1, box2):
-    # box1, box2 format: [x1, y1, x2, y2, x3, y3, x4, y4]
     poly1 = Polygon([(box1[i], box1[i+1]) for i in range(0, len(box1), 2)])
     poly2 = Polygon([(box2[i], box2[i+1]) for i in range(0, len(box2), 2)])
     if not poly1.is_valid or not poly2.is_valid:
@@ -23,35 +22,99 @@ def calculate_iou(box1, box2):
     union = poly1.union(poly2).area
     return intersection / union if union > 0 else 0
 
-# 학습 실행 (검증 데이터 사용 안 함)
-model.train(data=train_data, epochs=1, imgsz=640, batch=16, lr0=0.001, device='cuda', amp=False, val=False)
+# Step LR 설정 함수
+def adjust_learning_rate(optimizer, epoch, step_size, gamma=0.1):
+    if epoch % step_size == 0 and epoch > 0:
+        for param_group in optimizer.param_groups:
+            param_group['lr'] *= gamma
 
-# 학습된 모델 저장
-model.save(os.path.join(output_dir, 'TEST5_yolov11m.pt'))
+# 1단계 학습 (lr=0.001, 50 epochs)
+initial_lr = 0.001
+step_size = 10  # 학습률을 감소시키는 주기
+gamma = 0.1  # 감소율
+
+for epoch in range(50):
+    adjust_learning_rate(model.optimizer, epoch, step_size, gamma)
+    model.train(
+        data=train_data,
+        epochs=1,
+        imgsz=640,
+        batch=16,
+        lr0=initial_lr,
+        device='cuda',
+        amp=False,
+        patience=40,
+        val=False,
+        hsv_h=0.015,
+        hsv_s=0.7,
+        hsv_v=0.4,
+        flipud=0.5,
+        fliplr=0.5,
+        translate=0.1,
+        scale=0.5,
+        shear=0.2,
+        perspective=0.1,
+        mosaic=1.0,
+        copy_paste=1.0
+    )
+
+# 1단계 학습된 모델 저장
+model_save_path = os.path.join(output_dir, 'TEST2_1st.pt')
+model.save(model_save_path)
+
+# 1단계 학습된 파라미터를 불러오기
+model = YOLO(model_save_path)
+
+# 2단계 학습 (lr=0.0001, 50 epochs, 1단계 학습 파라미터 유지)
+initial_lr = 0.0001
+for epoch in range(50):
+    adjust_learning_rate(model.optimizer, epoch, step_size, gamma)
+    model.train(
+        data=train_data,
+        epochs=1,
+        imgsz=640,
+        batch=16,
+        lr0=initial_lr,
+        device='cuda',
+        amp=False,
+        val=False,
+        hsv_h=0.015,
+        hsv_s=0.7,
+        hsv_v=0.4,
+        flipud=0.5,
+        fliplr=0.5,
+        translate=0.1,
+        scale=0.5,
+        shear=0.2,
+        perspective=0.1,
+        mosaic=1.0,
+        copy_paste=1.0
+    )
+
+# 2단계 학습된 모델 저장
+model.save(os.path.join(output_dir, 'TEST2_2nd.pt'))
 
 # 테스트 이미지 경로 설정
 test_image_dir = '/home/jovyan/data-vol-1/trashcan/test_image2'
 
 # 모델 평가 함수
 def test_model():
-    # model.predict 사용하여 테스트 수행 및 결과 저장
     results = model.predict(
-        source=test_image_dir,  # 테스트할 이미지 폴더 경로
-        save=True,              # 결과 이미지를 저장
-        project=output_dir,     # 저장할 기본 디렉토리
-        name="1step_YOLO_result"  # 결과를 저장할 하위 폴더 이름
+        source=test_image_dir,
+        save=True,
+        project=output_dir,
+        name="2step_YOLO_result"
     )
-    print(f"Test results saved to: {os.path.join(output_dir, '1step_YOLO_result')}")
+    print(f"Test results saved to: {os.path.join(output_dir, '2step_YOLO_result')}")
     
-    # IoU 결과 저장할 파일 경로 설정
-    iou_results_path = os.path.join(output_dir, '1step_YOLO_result', 'iou_results.txt')
+    iou_results_path = os.path.join(output_dir, '2step_YOLO_result', 'iou_results.txt')
     with open(iou_results_path, 'w') as f:
         for result in results:
-            ground_truths = result.boxes  # 실제 바운딩 박스 (실제 데이터로 대체 가능)
-            predictions = result.pred  # 예측된 바운딩 박스
+            ground_truths = result.boxes.xyxy  # 실제 바운딩 박스 좌표
+            predictions = result.boxes.xyxy  # 예측된 바운딩 박스 좌표
             
             for gt_box, pred_box in zip(ground_truths, predictions):
-                iou = calculate_iou(gt_box.xyxy, pred_box.xyxy)
+                iou = calculate_iou(gt_box, pred_box)
                 f.write(f"IoU for {result.path}: {iou:.4f}\n")
     
     print(f"IoU results saved to: {iou_results_path}")
