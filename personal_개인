@@ -1,141 +1,16 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import cv2
-import os
-from torch.utils.data import DataLoader, Dataset
-import numpy as np
-from torchvision import transforms
-from PIL import Image
-import json
-from segment_anything import sam_model_registry, SamPredictor
-
-# SAM 모델을 로드하는 함수
-def load_sam_model(weight_path):
-    model = sam_model_registry["vit_b"](checkpoint=weight_path)  # SAM 모델 로드
-    print("Model successfully loaded.")
-    return model
-
-# 데이터셋 클래스 정의
-class SAMDatasetWithMeasurements(Dataset):
-    def __init__(self, image_folder, mask_folder, json_folder, transform=None, max_line_widths=10):
-        self.image_folder = image_folder
-        self.mask_folder = mask_folder
-        self.json_folder = json_folder
-        self.transform = transform
-        self.max_line_widths = max_line_widths
-        self.image_files = sorted([f for f in os.listdir(image_folder) if f.endswith('.png')])
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        image_path = os.path.join(self.image_folder, self.image_files[idx])
-        mask_path = os.path.join(self.mask_folder, self.image_files[idx].replace('.png', '_mask.png'))
-        json_path = os.path.join(self.json_folder, self.image_files[idx].replace('.png', '.json'))
-
-        # 이미지 로드 및 PIL 변환
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(image)
-
-        # 마스크 로드 및 PIL 변환
-        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(f"Mask not found for {mask_path}")
-        mask = Image.fromarray(mask)
-
-        # transform 적용
-        if self.transform:
-            image = self.transform(image)
-            mask = self.transform(mask)
-
-        # JSON에서 계측 정보 로드 및 고정 길이로 패딩
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-            line_widths = [item.get('line_width', 1.0) for item in data]
-        
-        if len(line_widths) > self.max_line_widths:
-            line_widths = line_widths[:self.max_line_widths]
-        else:
-            line_widths.extend([0] * (self.max_line_widths - len(line_widths)))
-
-        return image, mask, torch.tensor(line_widths, dtype=torch.float32)
-
-
-# 학습 및 테스트 함수 정의
-def train_and_test_sam(model, train_loader, test_loader, num_epochs, save_folder, test_save_folder):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    # 학습 루프
-    for epoch in range(num_epochs):
-        model.train()
-        total_loss = 0
-        for images, masks, line_widths in train_loader:
-            images, masks = images.to(device), masks.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, masks)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}")
-
-        # 모델 저장
-        if (epoch + 1) % 5 == 0:
-            torch.save(model.state_dict(), os.path.join(save_folder, f'sam_model_epoch_{epoch+1}.pth'))
-
-    # 테스트 루프
-    model.eval()
-    os.makedirs(test_save_folder, exist_ok=True)
-    
-    # SamPredictor 초기화
-    predictor = SamPredictor(model)
-
-    with torch.no_grad():
-        for idx, (images, masks, line_widths) in enumerate(test_loader):
-            images = images.to(device)
-            # Predictor를 사용하여 마스크 예측
-            predictor.set_image(images.cpu().numpy()[0].transpose(1, 2, 0))  # (H, W, C) 형태로 변환
-            output_mask = predictor.predict().astype(np.uint8)
-
-            # 결과를 이미지로 저장
-            output_path = os.path.join(test_save_folder, f'test_output_{idx}.png')
-            cv2.imwrite(output_path, output_mask)
-            print(f"Saved test result to {output_path}")
-
-            # 계측값 저장
-            line_widths_path = os.path.join(test_save_folder, f'line_widths_{idx}.txt')
-            np.savetxt(line_widths_path, line_widths.cpu().numpy(), fmt='%d')
-            print(f"Saved line widths to {line_widths_path}")
-
-# 경로 및 하이퍼파라미터 설정
-image_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/image'
-mask_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/mask'
-json_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/measure'
-weight_path = '/home/jovyan/SAM/sam_vit_b_01ec64.pth'
-save_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2'  # 학습된 모델을 저장할 폴더
-test_image_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/image'  # 테스트 이미지 폴더
-test_mask_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/mask'  # 테스트 마스크 폴더
-test_json_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/measure'  # 테스트 JSON 폴더
-test_save_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2'  # 테스트 결과를 저장할 폴더
-num_epochs = 2
-
-# 데이터 로더 설정
-transform = transforms.Compose([
-    transforms.Resize((256, 256)),  # 이미지 크기 고정
-    transforms.ToTensor()
-])
-
-train_dataset = SAMDatasetWithMeasurements(image_folder, mask_folder, json_folder, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-
-test_dataset = SAMDatasetWithMeasurements(test_image_folder, test_mask_folder, test_json_folder, transform=transform)
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-
-# 모델 로드 및 학습/테스트 실행
-sam_model = load_sam_model(weight_path)
-train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder, test_save_folder=test_save_folder)
+/home/jovyan/.conda/envs/aipbase/bin/python /home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py
+/home/jovyan/SAM_Model/segment_anything/build_sam.py:105: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(f)
+Model successfully loaded.
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 141, in <module>
+    train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder, test_save_folder=test_save_folder)
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 80, in train_and_test_sam
+    outputs = model(images)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+TypeError: Sam.forward() missing 1 required positional argument: 'multimask_output'
