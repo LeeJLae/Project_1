@@ -1,23 +1,16 @@
-모델이 성공적으로 로드되었습니다.
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 142, in <module>
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 123, in <module>
     train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder)
-  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 93, in train_and_test_sam
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 80, in train_and_test_sam
     for images, masks, line_widths in train_loader:
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
     data = self._next_data()
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
     data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 55, in fetch
-    return self.collate_fn(data)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 398, in default_collate
-    return collate(batch, collate_fn_map=default_collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 211, in collate
-    return [
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 212, in <listcomp>
-    collate(samples, collate_fn_map=collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 155, in collate
-    return collate_fn_map[elem_type](batch, collate_fn_map=collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 272, in collate_tensor_fn
-    return torch.stack(batch, 0, out=out)
-RuntimeError: stack expects each tensor to be equal size, but got [3, 2112, 2112] at entry 0 and [3, 2090, 2090] at entry 1
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 65, in __getitem__
+    line_widths = [item.get('line_width', 1.0) for item in data.get('lines', [])]
+AttributeError: 'list' object has no attribute 'get
