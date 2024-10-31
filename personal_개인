@@ -1,124 +1,16 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import cv2
-import os
-from torch.utils.data import DataLoader, Dataset
-import numpy as np
-from torchvision import transforms
-import json
-
-# SAM 모델 클래스를 정의합니다.
-class SAMModel(nn.Module):
-    def __init__(self):
-        super(SAMModel, self).__init__()
-        # 모델의 구조를 정의합니다 (예시로, 여기에 실제 SAM 모델 구조로 교체해야 합니다).
-        self.encoder = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.decoder = nn.Conv2d(64, 1, kernel_size=3, padding=1)
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
-def load_sam_model(weight_path):
-    model = SAMModel()  # 모델을 SAM 모델 클래스에 맞게 초기화합니다.
-    checkpoint = torch.load(weight_path, map_location='cpu')
-    model.load_state_dict(checkpoint, strict=False)
-    print("모델이 성공적으로 로드되었습니다.")
-    return model
-
-# 데이터셋 클래스 정의
-class SAMDatasetWithMeasurements(Dataset):
-    def __init__(self, image_folder, mask_folder, json_folder, transform=None):
-        self.image_folder = image_folder
-        self.mask_folder = mask_folder
-        self.json_folder = json_folder
-        self.transform = transform
-        self.image_files = sorted([f for f in os.listdir(image_folder) if f.endswith('.png')])
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        image_path = os.path.join(self.image_folder, self.image_files[idx])
-        mask_path = os.path.join(self.mask_folder, self.image_files[idx].replace('.png', '_mask.png'))
-        json_path = os.path.join(self.json_folder, self.image_files[idx].replace('.png', '.json'))
-
-        # 이미지 로드 및 전처리
-        image = cv2.imread(image_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        if self.transform:
-            image = self.transform(image)
-        else:
-            image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
-
-        # 마스크 로드
-        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(f"Mask not found for {mask_path}")
-        mask = torch.from_numpy(mask).float().unsqueeze(0) / 255.0
-
-        # JSON에서 계측 정보 로드
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-            line_widths = [item.get('line_width', 1.0) for item in data.get('lines', [])]
-
-        return image, mask, torch.tensor(line_widths, dtype=torch.float32)
-
-# 학습 및 테스트 함수 정의
-def train_and_test_sam(model, train_loader, test_loader, num_epochs, save_folder):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model.to(device)
-    criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-    # 학습 루프
-    for epoch in range(num_epochs):
-        model.train()
-        total_loss = 0
-        for images, masks, line_widths in train_loader:
-            images, masks = images.to(device), masks.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, masks)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}")
-
-        # 주기적인 모델 저장
-        if (epoch + 1) % 5 == 0:
-            torch.save(model.state_dict(), os.path.join(save_folder, f'sam_model_epoch_{epoch+1}.pth'))
-
-    # 테스트 루프
-    model.eval()
-    os.makedirs(save_folder, exist_ok=True)
-    with torch.no_grad():
-        for idx, (images, masks, line_widths) in enumerate(test_loader):
-            images = images.to(device)
-            outputs = model(images)
-            output_mask = torch.sigmoid(outputs).cpu().numpy()[0, 0] > 0.5
-            output_mask = (output_mask * 255).astype(np.uint8)
-            output_path = os.path.join(save_folder, f'test_output_{idx}.png')
-            cv2.imwrite(output_path, output_mask)
-            print(f"Saved test result to {output_path}")
-
-# 경로 및 하이퍼파라미터 설정
-image_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/image'
-mask_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/mask'
-json_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/measure'
-weight_path = '/path/to/initial_weights.pth'
-save_folder = '/home/jovyan/data-vol-1/Result/SAM'  # 모든 결과를 저장할 폴더
-num_epochs = 10
-
-# 데이터 로더 설정
-transform = transforms.Compose([transforms.ToTensor()])
-train_dataset = SAMDatasetWithMeasurements(image_folder, mask_folder, json_folder, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-test_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
-
-# 모델 로드 및 학습/테스트 실행
-sam_model = load_sam_model(weight_path)
-train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder)
-
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 135, in <module>
+    train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder)
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 86, in train_and_test_sam
+    for images, masks, line_widths in train_loader:
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 68, in __getitem__
+    line_widths = [item.get('line_width', 1.0) for item in data.get('lines', [])]
+AttributeError: 'list' object has no attribute 'get'
