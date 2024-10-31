@@ -1,16 +1,18 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/2.SAM_DataAug.py", line 114, in <module>
-    for images, masks, measurements in train_loader:
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
-    data = self._next_data()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
-    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-  File "/home/jovyan/jonglae/Retry1/DO/2.SAM_DataAug.py", line 60, in __getitem__
-    measurement = self.rotate_coordinates(measurement, angle, image.size)
-  File "/home/jovyan/jonglae/Retry1/DO/2.SAM_DataAug.py", line 38, in rotate_coordinates
-    for coord in rotated_measurement['coordinates']:
-KeyError: 'coordinates'
+[
+    {
+        "type": "line",
+        "points": [
+            {
+                "x": 133.21631218473732,
+                "y": 1911.1980614025235
+            },
+            {
+                "x": 618.8007279247622,
+                "y": 1931.292219519215
+            }
+        ],
+        "line_width": 1.0,
+        "color": "RGB(255, 255, 255)"
+    },
+    {
+        "type": "line",
