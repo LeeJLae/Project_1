@@ -1,16 +1,131 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 149, in <module>
-    train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder, test_save_folder=test_save_folder)
-  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 80, in train_and_test_sam
-    outputs = model(images, multimask_output)  # multimask_output 인자 추가
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/jovyan/SAM_Model/segment_anything/modeling/sam.py", line 97, in forward
-    input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
-  File "/home/jovyan/SAM_Model/segment_anything/modeling/sam.py", line 97, in <listcomp>
-    input_images = torch.stack([self.preprocess(x["image"]) for x in batched_input], dim=0)
-IndexError: too many indices for tensor of dimension 3
+import os
+import torch
+import json
+from torch.utils.data import Dataset, DataLoader
+from segment_anything import sam_model_registry, SamPredictor
+from torchvision import transforms
+from PIL import Image
+import matplotlib.pyplot as plt
+import numpy as np
+
+# 1. 데이터셋 클래스 정의
+class MaskDataset(Dataset):
+    def __init__(self, image_dir, mask_dir, json_dir, transform=None):
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.json_dir = json_dir
+        self.transform = transform
+        self.image_files = sorted(os.listdir(image_dir))
+        self.mask_files = sorted(os.listdir(mask_dir))
+        self.json_files = sorted(os.listdir(json_dir))
+    
+    def __len__(self):
+        return len(self.image_files)
+    
+    def __getitem__(self, idx):
+        image_path = os.path.join(self.image_dir, self.image_files[idx])
+        mask_path = os.path.join(self.mask_dir, self.mask_files[idx])
+        json_path = os.path.join(self.json_dir, self.json_files[idx])
+        
+        image = Image.open(image_path).convert("RGB")
+        mask = Image.open(mask_path).convert("L")
+
+        # 크기 조정 (모든 이미지와 마스크를 동일한 크기로 맞춤)
+        target_size = (256, 256)  # 원하는 크기로 설정
+        image = image.resize(target_size, Image.ANTIALIAS)
+        mask = mask.resize(target_size, Image.ANTIALIAS)
+
+        if self.transform:
+            image = self.transform(image)
+            mask = self.transform(mask)
+
+        with open(json_path, 'r') as f:
+            measurement = json.load(f)
+        
+        return image, mask, measurement
+
+# 2. 모델 초기화 및 프리트레인된 가중치 로드
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model_type = "vit_h"  # 사용할 모델의 타입
+model = sam_model_registry[model_type](checkpoint="/home/jovyan/SAM/sam_vit_b_01ec64.pth").to(device)
+
+# 3. 데이터 로더 정의
+transform = transforms.Compose([
+    transforms.ToTensor()
+])
+
+# 사용자 지정 데이터셋 경로 설정
+train_image_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/image"  # 학습 이미지 경로
+train_mask_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/mask"     # 학습 마스크 경로
+train_json_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/measure"     # 학습 JSON 경로
+
+train_dataset = MaskDataset(train_image_dir, train_mask_dir, train_json_dir, transform=transform)
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+
+# 4. 손실 함수 및 최적화기 설정
+criterion = torch.nn.BCEWithLogitsLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# 5. 학습 루프
+num_epochs = 10
+for epoch in range(num_epochs):
+    model.train()
+    running_loss = 0.0
+    for images, masks, measurements in train_loader:
+        images, masks = images.to(device), masks.to(device)
+        
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, masks)
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+    
+    print(f"에포크 {epoch+1}/{num_epochs}, 손실: {running_loss/len(train_loader)}")
+
+# 모델 파라미터 저장 경로 설정
+model_params_save_path = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2/sam_model_parameters.pth"  # 저장할 경로 입력
+torch.save(model.state_dict(), model_params_save_path)
+print(f"모델 파라미터가 '{model_params_save_path}'에 저장되었습니다.")
+
+# 6. 테스트 및 결과 저장 함수 정의
+def save_test_results(model, test_image_dir, test_mask_dir, test_json_dir, output_dir):
+    test_dataset = MaskDataset(test_image_dir, test_mask_dir, test_json_dir, transform=transform)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    
+    model.eval()
+    os.makedirs(output_dir, exist_ok=True)
+    
+    predictor = SamPredictor(model)
+    
+    with torch.no_grad():
+        for i, (image, mask, measurement) in enumerate(test_loader):
+            image = image.to(device)
+            predictor.set_image(image.cpu().numpy())
+            output = predictor.predict()  # 모델 예측
+            
+            # 결과 이미지 및 계측 데이터 저장
+            output_image = output.squeeze().cpu().numpy()
+            plt.imshow(output_image, cmap='gray')
+            plt.savefig(os.path.join(output_dir, f"result_{i}.png"))
+            
+            # 계측 데이터 저장
+            measurement_path = os.path.join(output_dir, f"measurement_{i}.txt")
+            with open(measurement_path, 'w') as f:
+                json.dump(measurement, f)
+            
+            print(f"결과 이미지 및 계측 파일이 {output_dir}에 저장되었습니다.")
+
+# 7. 테스트 실행 및 결과 저장
+test_image_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/image"   # 테스트 이미지 경로
+test_mask_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/mask"     # 테스트 마스크 경로
+test_json_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/measure"     # 테스트 JSON 경로
+output_results_dir = "/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2"  # 결과 저장 경로
+
+save_test_results(model, test_image_dir, test_mask_dir, test_json_dir, output_results_dir)
+
+
+
+
+
