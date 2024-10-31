@@ -8,34 +8,22 @@ import numpy as np
 from torchvision import transforms
 from PIL import Image
 import json
+from segment_anything import sam_model_registry, SamPredictor
 
-# SAM Model definition
-class SAMModel(nn.Module):
-    def __init__(self):
-        super(SAMModel, self).__init__()
-        self.encoder = nn.Conv2d(3, 64, kernel_size=3, padding=1)
-        self.decoder = nn.Conv2d(64, 1, kernel_size=3, padding=1)
-
-    def forward(self, x):
-        x = self.encoder(x)
-        x = self.decoder(x)
-        return x
-
+# SAM 모델을 로드하는 함수
 def load_sam_model(weight_path):
-    model = SAMModel()
-    checkpoint = torch.load(weight_path, map_location='cpu')
-    model.load_state_dict(checkpoint, strict=False)
+    model = sam_model_registry["vit_b"](checkpoint=weight_path)  # SAM 모델 로드
     print("Model successfully loaded.")
     return model
 
-# Dataset class for SAM with measurements
+# 데이터셋 클래스 정의
 class SAMDatasetWithMeasurements(Dataset):
     def __init__(self, image_folder, mask_folder, json_folder, transform=None, max_line_widths=10):
         self.image_folder = image_folder
         self.mask_folder = mask_folder
         self.json_folder = json_folder
         self.transform = transform
-        self.max_line_widths = max_line_widths  # 고정된 길이 설정
+        self.max_line_widths = max_line_widths
         self.image_files = sorted([f for f in os.listdir(image_folder) if f.endswith('.png')])
 
     def __len__(self):
@@ -49,13 +37,13 @@ class SAMDatasetWithMeasurements(Dataset):
         # 이미지 로드 및 PIL 변환
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        image = Image.fromarray(image)  # numpy 이미지를 PIL로 변환
+        image = Image.fromarray(image)
 
         # 마스크 로드 및 PIL 변환
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             raise FileNotFoundError(f"Mask not found for {mask_path}")
-        mask = Image.fromarray(mask)  # numpy 마스크를 PIL로 변환
+        mask = Image.fromarray(mask)
 
         # transform 적용
         if self.transform:
@@ -67,7 +55,6 @@ class SAMDatasetWithMeasurements(Dataset):
             data = json.load(f)
             line_widths = [item.get('line_width', 1.0) for item in data]
         
-        # line_widths를 max_line_widths 길이로 패딩 또는 자르기
         if len(line_widths) > self.max_line_widths:
             line_widths = line_widths[:self.max_line_widths]
         else:
@@ -75,14 +62,15 @@ class SAMDatasetWithMeasurements(Dataset):
 
         return image, mask, torch.tensor(line_widths, dtype=torch.float32)
 
-# Training and testing function
-def train_and_test_sam(model, train_loader, test_loader, num_epochs, save_folder):
+
+# 학습 및 테스트 함수 정의
+def train_and_test_sam(model, train_loader, test_loader, num_epochs, save_folder, test_save_folder):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-    # Training loop
+    # 학습 루프
     for epoch in range(num_epochs):
         model.train()
         total_loss = 0
@@ -96,44 +84,58 @@ def train_and_test_sam(model, train_loader, test_loader, num_epochs, save_folder
             total_loss += loss.item()
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss/len(train_loader):.4f}")
 
-        # Save model periodically
+        # 모델 저장
         if (epoch + 1) % 5 == 0:
             torch.save(model.state_dict(), os.path.join(save_folder, f'sam_model_epoch_{epoch+1}.pth'))
 
-    # Testing loop
+    # 테스트 루프
     model.eval()
-    os.makedirs(save_folder, exist_ok=True)
+    os.makedirs(test_save_folder, exist_ok=True)
+    
+    # SamPredictor 초기화
+    predictor = SamPredictor(model)
+
     with torch.no_grad():
         for idx, (images, masks, line_widths) in enumerate(test_loader):
             images = images.to(device)
-            outputs = model(images)
-            output_mask = torch.sigmoid(outputs).cpu().numpy()[0, 0] > 0.5
-            output_mask = (output_mask * 255).astype(np.uint8)
-            output_path = os.path.join(save_folder, f'test_output_{idx}.png')
+            # Predictor를 사용하여 마스크 예측
+            predictor.set_image(images.cpu().numpy()[0].transpose(1, 2, 0))  # (H, W, C) 형태로 변환
+            output_mask = predictor.predict().astype(np.uint8)
+
+            # 결과를 이미지로 저장
+            output_path = os.path.join(test_save_folder, f'test_output_{idx}.png')
             cv2.imwrite(output_path, output_mask)
             print(f"Saved test result to {output_path}")
 
-# Paths and hyperparameters
+            # 계측값 저장
+            line_widths_path = os.path.join(test_save_folder, f'line_widths_{idx}.txt')
+            np.savetxt(line_widths_path, line_widths.cpu().numpy(), fmt='%d')
+            print(f"Saved line widths to {line_widths_path}")
+
+# 경로 및 하이퍼파라미터 설정
 image_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/image'
 mask_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/mask'
 json_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/measure'
 weight_path = '/home/jovyan/SAM/sam_vit_b_01ec64.pth'
-save_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2'
-num_epochs = 10
+save_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2'  # 학습된 모델을 저장할 폴더
+test_image_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/image'  # 테스트 이미지 폴더
+test_mask_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/mask'  # 테스트 마스크 폴더
+test_json_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Test/measure'  # 테스트 JSON 폴더
+test_save_folder = '/home/jovyan/data-vol-1/Y_T_Result/SAM_Result/test2'  # 테스트 결과를 저장할 폴더
+num_epochs = 2
 
-# DataLoader setup
-fixed_size = (256, 256)
-
-# transform에 Resize 추가
+# 데이터 로더 설정
 transform = transforms.Compose([
-    transforms.Resize(fixed_size),  # 이미지 크기를 고정합니다.
+    transforms.Resize((256, 256)),  # 이미지 크기 고정
     transforms.ToTensor()
 ])
 
 train_dataset = SAMDatasetWithMeasurements(image_folder, mask_folder, json_folder, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-test_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
 
-# Load model and execute train/test
+test_dataset = SAMDatasetWithMeasurements(test_image_folder, test_mask_folder, test_json_folder, transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+# 모델 로드 및 학습/테스트 실행
 sam_model = load_sam_model(weight_path)
-train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder)
+train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder, test_save_folder=test_save_folder)
