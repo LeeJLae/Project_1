@@ -1,40 +1,22 @@
-[
-    {
-        "type": "line",
-        "points": [
-            {
-                "x": 131.83778763867278,
-                "y": 1910.8911718159632
-            },
-            {
-                "x": 531.6966851413897,
-                "y": 1921.514828809285
-            }
-        ],
-        "line_width": 1.0,
-        "color": [
-            255,
-            255,
-            255
-        ]
-    },
-    {
-        "type": "line",
-        "points": [
-            {
-                "x": -67.19240196078363,
-                "y": 809.9608823529425
-            },
-            {
-                "x": 3588.1237745098006,
-                "y": 809.9608823529425
-            }
-        ],
-        "line_width": 1.0,
-        "color": [
-            255,
-            255,
-            255
-        ]
-    },
-    {
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 123, in <module>
+    train_and_test_sam(sam_model, train_loader, test_loader, num_epochs=num_epochs, save_folder=save_folder)
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 80, in train_and_test_sam
+    for images, masks, line_widths in train_loader:
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 55, in fetch
+    return self.collate_fn(data)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 398, in default_collate
+    return collate(batch, collate_fn_map=default_collate_fn_map)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 211, in collate
+    return [
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 212, in <listcomp>
+    collate(samples, collate_fn_map=collate_fn_map)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 155, in collate
+    return collate_fn_map[elem_type](batch, collate_fn_map=collate_fn_map)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 272, in collate_tensor_fn
+    return torch.stack(batch, 0, out=out)
+RuntimeError: stack expects each tensor to be equal size, but got [3, 2080, 2080] at entry 0 and [3, 2062, 2062] at entry 1
