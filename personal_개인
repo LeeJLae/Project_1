@@ -1,24 +1,214 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/33333.py", line 213, in <module>
-    main()
-  File "/home/jovyan/jonglae/Retry1/Segmentation/33333.py", line 198, in main
-    train_sam_with_image_mask(
-  File "/home/jovyan/jonglae/Retry1/Segmentation/33333.py", line 121, in train_sam_with_image_mask
-    for images, measurements in dataloader:
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
-    data = self._next_data()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
-    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
-    data = [self.dataset[idx] for idx in possibly_batched_index]
-  File "/home/jovyan/jonglae/Retry1/Segmentation/33333.py", line 87, in __getitem__
-    measurement = load_measurements(self.measure_xml_paths[idx], original_shape, resize_shape=self.resize_shape)
-  File "/home/jovyan/jonglae/Retry1/Segmentation/33333.py", line 46, in load_measurements
+import os
+import cv2
+import yaml
+import torch
+from torch.utils.data import Dataset, DataLoader
+import xml.etree.ElementTree as ET
+import numpy as np
+from segment_anything import sam_model_registry, SamPredictor
+from PIL import Image
+import torchvision.transforms as transforms
+import torch.nn.functional as F
+
+# YAML 파일 불러오기 함수
+def load_config(yaml_path):
+    with open(yaml_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return config
+
+def load_sam_model(weight_path, model_type='vit_b'):
+    # SAM 모델 로드
+    model = sam_model_registry[model_type](checkpoint=weight_path)
+    predictor = SamPredictor(model)
+    return predictor
+
+# 이미지 전처리 함수
+def preprocess_image_for_sam(image):
+    if isinstance(image, torch.Tensor):
+        return image.unsqueeze(0)
+    
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
+    image = image.convert("RGB")
+    
+    transform = transforms.Compose([
+        transforms.Resize((1024, 1024)),  # 이미지를 1024x1024로 리사이즈
+        transforms.ToTensor()
+    ])
+    
+    tensor_image = transform(image).unsqueeze(0)
+    return tensor_image
+
+# Measure XML에서 측정값 불러오기
+def load_measurements(measure_xml_path, original_shape, resize_shape=(1024, 1024)):
+    # XML에서 측정값 불러오기
+    measurements = {}
     tree = ET.parse(measure_xml_path)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/xml/etree/ElementTree.py", line 1222, in parse
-    tree.parse(source, parser)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/xml/etree/ElementTree.py", line 569, in parse
-    source = open(source, "rb")
-FileNotFoundError: [Errno 2] No such file or directory: '/home/jovyan/data-vol-1/Y_T_Result/SAM_Train/measure/image95_overlay.xml'
+    root = tree.getroot()
+    
+    # 리사이즈 비율 계산
+    x_scale = resize_shape[1] / original_shape[1]
+    y_scale = resize_shape[0] / original_shape[0]
+    
+    for measure in root.findall('measurement'):
+        name = measure.find('name').text
+        value = float(measure.find('value').text)
+        
+        # width, height, area 값을 조정
+        if name == "width":
+            value *= x_scale
+        elif name == "height":
+            value *= y_scale
+        elif name == "area":
+            value *= x_scale * y_scale
+
+        measurements[name] = value
+    return measurements
+
+# Dataset 정의 (이미지와 마스크 쌍을 반환)
+class ImageMaskDataset(Dataset):
+    def __init__(self, image_dir, measure_xml_dir, resize_shape=(1024, 1024)):
+        self.image_paths = [os.path.join(image_dir, file) for file in sorted(os.listdir(image_dir)) if file.endswith(('.jpg', '.png'))]
+        self.measure_xml_paths = [os.path.join(measure_xml_dir, os.path.splitext(file)[0] + ".xml") for file in sorted(os.listdir(image_dir)) if file.endswith(('.jpg', '.png'))]
+        self.resize_shape = resize_shape
+        self.transform = transforms.Compose([
+            transforms.Resize(self.resize_shape),
+            transforms.ToTensor()
+        ])
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        image = self.load_image(self.image_paths[idx])
+        original_shape = image.size  # 원본 이미지 크기 저장
+        image = self.transform(image)
+        
+        measurement = load_measurements(self.measure_xml_paths[idx], original_shape, resize_shape=self.resize_shape)
+        return image, measurement
+
+    def load_image(self, path):
+        return Image.open(path).convert("RGB")
+
+# SAM 모델의 특정 파라미터만 학습 가능하도록 설정
+def set_trainable_layers(predictor, train_layers=None):
+    for name, param in predictor.model.named_parameters():
+        if train_layers is None or any(layer_name in name for layer_name in train_layers):
+            param.requires_grad = True
+        else:
+            param.requires_grad = False
+    print("Trainable layers set:", train_layers)
+
+# Focal Loss 정의
+def focal_loss(pred, target, alpha=0.8, gamma=2):
+    pred = torch.sigmoid(pred)
+    BCE_loss = F.binary_cross_entropy(pred, target, reduction='none')
+    pt = torch.exp(-BCE_loss)
+    focal_loss = alpha * (1 - pt) ** gamma * BCE_loss
+    return focal_loss.mean()
+
+# 학습 함수 정의
+def train_sam_with_image_mask(predictor, dataloader, epochs, learning_rate=1e-4, device='cuda', save_path=None):
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, predictor.model.parameters()), lr=learning_rate)
+    criterion_measure = torch.nn.MSELoss()
+    
+    set_trainable_layers(predictor, train_layers=["head"])  # head 부분만 학습 가능하게 설정
+    predictor.model.to(device)
+    
+    for epoch in range(epochs):
+        predictor.model.train()
+        epoch_loss_seg, epoch_loss_measure = 0, 0
+        for images, measurements in dataloader:
+            images = [img.to(device) for img in images]
+            optimizer.zero_grad()
+            
+            loss_measure_total = torch.tensor(0.0, device=device, requires_grad=True)
+            
+            for img, measurement in zip(images, measurements):
+                preprocessed_image = preprocess_image_for_sam(img).squeeze(0).to(device)
+                
+                predictor.set_image(preprocessed_image)
+                predictions, _, _ = predictor.predict(multimask_output=False)
+                
+                predicted_measurement = predictions.mean(dim=[1, 2, 3])
+                measurement_tensor = torch.tensor([measurement], dtype=torch.float32).to(device)
+                loss_measure = criterion_measure(predicted_measurement, measurement_tensor)
+                
+                loss_measure_total += loss_measure
+
+            total_loss = loss_measure_total
+            total_loss.backward()
+            optimizer.step()
+
+            epoch_loss_measure += loss_measure_total.item()
+        
+        print(f"Epoch {epoch+1}/{epochs}, Measurement Loss: {epoch_loss_measure/len(dataloader)}")
+    
+    # 가중치 저장
+    if save_path:
+        torch.save(predictor.model.state_dict(), save_path)
+        print(f"Model weights saved to {save_path}")
+
+# 테스트 함수 정의
+def test_sam_with_image_only(predictor, image_folder, measure_xml_folder, output_folder, device='cuda'):
+    predictor.model.eval()
+    os.makedirs(output_folder, exist_ok=True)
+    
+    with torch.no_grad():
+        for image_name in os.listdir(image_folder):
+            if not image_name.endswith(('.jpg', '.png')):
+                continue
+
+            image_path = os.path.join(image_folder, image_name)
+            measure_xml_path = os.path.join(measure_xml_folder, os.path.splitext(image_name)[0] + ".xml")
+            image = Image.open(image_path).convert("RGB")
+            
+            preprocessed_image = preprocess_image_for_sam(image).squeeze(0).to(device)
+            predictor.set_image(preprocessed_image)
+            prediction, _, _ = predictor.predict(multimask_output=False)
+            
+            # 예측 결과 저장
+            if isinstance(prediction, torch.Tensor):
+                prediction_image = (prediction * 255).cpu().numpy().astype(np.uint8)
+            else:
+                prediction_image = (prediction * 255).astype(np.uint8)
+            prediction_image = prediction_image.squeeze()
+            
+            mask_output_path = os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_pred_mask.png")
+            Image.fromarray(prediction_image).save(mask_output_path)
+
+            # 측정값 예측 결과 저장
+            measurement_prediction = prediction.mean().item()
+            with open(os.path.join(output_folder, f"{os.path.splitext(image_name)[0]}_pred_measure.txt"), 'w') as f:
+                f.write(f"Predicted Measurement: {measurement_prediction:.4f}\n")
+            print(f"Processed {image_name}: Measurement saved at {mask_output_path}")
+
+# 전체 실행 함수
+def main():
+    config = load_config('/home/jovyan/jonglae/Retry1/Segmentation/config.yaml')
+    
+    predictor = load_sam_model(config['model']['weight_path'], config['model']['model_type'])
+
+    dataset = ImageMaskDataset(
+        image_dir=config['data']['image_dir'],
+        measure_xml_dir=config['data']['measure_xml_dir'],
+        resize_shape=(1024, 1024)  # 이미지와 마스크 모두 동일 크기로 조정
+    )
+    dataloader = DataLoader(dataset, batch_size=config['train']['batch_size'], shuffle=True)
+    train_sam_with_image_mask(
+        predictor, 
+        dataloader, 
+        epochs=config['train']['epochs'], 
+        learning_rate=config['train']['learning_rate'], 
+        device='cuda', 
+        save_path=config['train']['save_weight_path']  # 가중치 저장 경로
+    )
+
+    test_image_folder = config['data']['test_image_dir']
+    test_measure_xml_folder = config['data']['test_measure_xml_dir']
+    output_folder = config['data']['output_dir']
+    test_sam_with_image_only(predictor, test_image_folder, test_measure_xml_folder, output_folder, device='cuda')
+
+if __name__ == "__main__":
+    main()
+
