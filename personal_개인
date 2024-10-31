@@ -1,18 +1,14 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 77, in <module>
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 82, in <module>
     for images, masks, measurements in train_loader:
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
     data = self._next_data()
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
     data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 55, in fetch
-    return self.collate_fn(data)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 398, in default_collate
-    return collate(batch, collate_fn_map=default_collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 211, in collate
-    return [
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 212, in <listcomp>
-    collate(samples, collate_fn_map=collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 207, in collate
-    raise RuntimeError("each element in list of batch should be of equal size")
-RuntimeError: each element in list of batch should be of equal size
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 52, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/jovyan/jonglae/Retry1/Segmentation/1.SAM_NoDataAug2.py", line 46, in __getitem__
+    raise ValueError(f"Image and mask sizes do not match: {image.size()} vs {mask.size()}")
+ValueError: Image and mask sizes do not match: torch.Size([3, 256, 256]) vs torch.Size([1, 256, 256])
