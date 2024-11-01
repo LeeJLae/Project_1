@@ -1,12 +1,20 @@
+
+##############################################################################
+## 1. 위치 기반 손실 함수 가중치 설정 -> 좌측 하단 또는 하단
+## 2. 위치 히트맵 적용
+##############################################################################
+
+
 from ultralytics import YOLO
 import os
 from shapely.geometry import Polygon
+import torch
 
 # YOLO 모델 로드
 model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 
 # 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
-train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
+train_data = '/home/jovyan/data-vol-1/Y_T_Data/YOLO_WB.yaml'
 
 # 학습 결과를 저장할 디렉토리 생성
 output_dir = '/home/jovyan/data-vol-1/Result/YOLO/1STEP_yolov11m'
@@ -35,17 +43,52 @@ def load_ground_truth_boxes(label_folder, image_name):
         print(f"Warning: Ground truth file {label_path} not found.")
     return boxes
 
+# 특정 위치에 대한 가중치를 높이기 위한 커스텀 손실 함수 정의
+def custom_loss_function(predictions, targets):
+    loss = model.loss_function(predictions, targets)
+    
+    # 특정 클래스에 대한 위치 기반 가중치 부여 (예: 클래스 ID가 0번인 경우)
+    for pred, target in zip(predictions, targets):
+        class_id = target[0].item()
+        if class_id == 0:  # 특정 클래스 ID (0번)
+            x, y = pred[0][0], pred[0][1]  # 예측 바운딩 박스의 중심 좌표
+            if x < 0.3 and y > 0.7:  # 좌측 하단 또는 하단 부분에 위치하는 경우
+                loss += 2.0 * loss  # 가중치를 더 높여서 손실을 증가시킴
+    return loss
+
+# 위치 기반 히트맵 생성 함수
+def generate_position_heatmap(image_size):
+    heatmap = torch.zeros((image_size, image_size))
+    for i in range(image_size):
+        for j in range(image_size):
+            if i > image_size * 0.7 and j < image_size * 0.3:
+                heatmap[i, j] = 1.0  # 하단 및 좌측 하단에 1.0 값을 부여
+    return heatmap
+
 # 학습 실행
 model.train(
     data=train_data,
-    epochs=50,               # 전체 에포크 수를 지정
+    epochs=50,
     imgsz=640,
     batch=16,
-    lr0=0.001,               # 초기 학습률 설정
+    lr0=0.001,
     device='cuda',
     amp=False,
-    val=False
+    val=False,
+    custom_loss=custom_loss_function  # 커스텀 손실 함수 적용
 )
+
+# 히트맵을 이미지에 추가하기 위한 함수 정의
+def apply_heatmap_to_images(image_folder, heatmap):
+    for image_file in os.listdir(image_folder):
+        image_path = os.path.join(image_folder, image_file)
+        image = torch.load(image_path)
+        image += heatmap  # 히트맵을 이미지에 추가하여 특정 위치에 대한 민감도 증가
+        torch.save(image, image_path)
+
+# 히트맵 생성 및 적용
+heatmap = generate_position_heatmap(640)
+apply_heatmap_to_images('/home/jovyan/data-vol-1/dataset/train/images', heatmap)
 
 # 학습된 모델 저장
 model.save(os.path.join(output_dir, '1STEP_yolov11m.pt'))
@@ -57,13 +100,13 @@ label_folder = '/home/jovyan/data-vol-1/dataset/test/labels'
 # 모델 평가 함수
 def test_model():
     results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
-    os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
+    os.makedirs(results_folder, exist_ok=True)
     
     results = model.predict(
-        source=test_image_folder,  # 테스트할 이미지 폴더 경로
-        save=True,                 # 결과 이미지를 저장
-        project=output_dir,        # 저장할 기본 디렉토리
-        name="1STEP_YOLO_result"   # 결과를 저장할 하위 폴더 이름
+        source=test_image_folder,
+        save=True,
+        project=output_dir,
+        name="1STEP_YOLO_result"
     )
     print(f"Test results saved to: {results_folder}")
     
@@ -71,9 +114,9 @@ def test_model():
     iou_results_path = os.path.join(results_folder, 'iou_results.txt')
     with open(iou_results_path, 'w') as f:
         for result in results:
-            image_name = os.path.basename(result.path)  # 이미지 이름
-            ground_truths = load_ground_truth_boxes(label_folder, image_name)  # 정답 바운딩 박스 불러오기
-            predictions = result.boxes.xyxy if result.boxes is not None else []  # 예측 바운딩 박스
+            image_name = os.path.basename(result.path)
+            ground_truths = load_ground_truth_boxes(label_folder, image_name)
+            predictions = result.boxes.xyxy if result.boxes is not None else []
             
             # IoU 계산 및 저장
             for gt_box, pred_box in zip(ground_truths, predictions):
