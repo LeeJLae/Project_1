@@ -1,161 +1,44 @@
-# SimCLR은 **NT-Xent 손실(Normalized Temperature-scaled Cross Entropy Loss)**를 사용
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from ultralytics import YOLO
-from torchvision.models import resnet50
-import torchvision.transforms as T
 import os
-from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-import torch.optim as optim
+import xml.etree.ElementTree as ET
+import re
 
-class CustomDataset(Dataset):
-    def __init__(self, images_folder, labels_folder=None, transform=None, contrastive=False):
-        self.images_path = [os.path.join(images_folder, img) for img in os.listdir(images_folder)]
-        self.labels_path = [os.path.join(labels_folder, lbl) for lbl in os.listdir(labels_folder)] if labels_folder else None
-        self.transform = transform
-        self.contrastive = contrastive
+# XML 파일을 YOLO 형식의 TXT로 변환하는 함수
+def convert_xml_to_yolo_format(input_xml_path, output_txt_path):
+    tree = ET.parse(input_xml_path)
+    root = tree.getroot()
     
-    def __len__(self):
-        return len(self.images_path)
+    with open(output_txt_path, 'w') as f:
+        for elem in root.iter("text"):
+            # `<text>` 태그에서 2자리 또는 3자리 정수 값 추출
+            match = re.search(r'\b\d{2,3}\b', elem.text)
+            if match:
+                value = int(match.group())
+                # 예시: 클래스 ID 0, 중심_x 0.5, 중심_y 0.5, 너비와 높이는 추출한 값을 100으로 나눈 값, 각도 0
+                f.write(f"0 0.5 0.5 {value / 100} {value / 100} 0\n")
     
-    def __getitem__(self, idx):
-        image = Image.open(self.images_path[idx]).convert("RGB")
-        if self.contrastive:
-            # 같은 이미지의 두 가지 다른 증강 뷰 생성
-            img1 = self.transform(image)
-            img2 = self.transform(image)
-            return img1, img2
-        else:
-            label = self.load_label(self.labels_path[idx]) if self.labels_path else None
-            if self.transform:
-                image = self.transform(image)
-            return image, label
+    print(f"Converted XML to YOLO format TXT at: {output_txt_path}")
+
+# 클래스 위치 정보와 계측 정보를 병합하는 함수
+def combine_txt_files(class_location_txt, measurement_txt, output_combined_txt):
+    with open(class_location_txt, 'r') as class_file, open(measurement_txt, 'r') as measure_file, open(output_combined_txt, 'w') as output_file:
+        # 클래스 위치 정보 병합
+        for class_line in class_file:
+            output_file.write(class_line)
+        
+        # 계측 정보 병합
+        for measure_line in measure_file:
+            output_file.write(measure_line)
     
-    @staticmethod
-    def load_label(label_path):
-        with open(label_path, 'r') as file:
-            label = file.read()
-        return label
+    print(f"Combined file created at: {output_combined_txt}")
 
-class SimCLRBackbone(nn.Module):
-    def __init__(self, simclr_backbone_path=None, feature_dim=128):
-        super(SimCLRBackbone, self).__init__()
-        
-        # ResNet 백본 로컬에서 로드
-        self.encoder = resnet50(weights=None)
-        if simclr_backbone_path:
-            self.encoder.load_state_dict(torch.load(simclr_backbone_path))
-        num_ftrs = self.encoder.fc.in_features
-        
-        # ResNet의 마지막 FC 레이어 제거
-        self.encoder.fc = nn.Identity()
-        
-        # SimCLR Projection Head (2-layer MLP)
-        self.projector = nn.Sequential(
-            nn.Linear(num_ftrs, num_ftrs),
-            nn.ReLU(),
-            nn.Linear(num_ftrs, feature_dim)
-        )
-    
-    def forward(self, x):
-        features = self.encoder(x)         # ResNet으로 특징 추출
-        embeddings = self.projector(features)  # Projection Head를 통한 임베딩 공간 매핑
-        return embeddings
+# 경로 설정
+input_xml_path = '/path/to/input.xml'             # XML 파일 경로
+converted_txt_path = '/path/to/measurement.txt'   # 변환된 계측 정보 TXT 파일 경로
+class_location_txt = '/path/to/class_location.txt' # 클래스 위치 정보 TXT 파일 경로
+output_combined_txt = '/path/to/output_combined.txt' # 병합된 출력 파일 경로
 
-class SimCLRTrainer:
-    def __init__(self, feature_dim=128):
-        self.model = SimCLRBackbone(feature_dim=feature_dim)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
-    
-    def contrastive_loss(self, z_i, z_j, temperature=0.5):
-        batch_size = z_i.size(0)
-        z = torch.cat([z_i, z_j], dim=0)  # (2 * batch_size, dim)
-        sim_matrix = F.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2)
-        sim_matrix /= temperature
-        mask = torch.eye(2 * batch_size, dtype=torch.bool).to(z.device)
-        sim_matrix = sim_matrix.masked_fill(mask, -float('inf'))
-        pos_sim = torch.cat([torch.diag(sim_matrix, batch_size), torch.diag(sim_matrix, -batch_size)], dim=0)
-        loss = -torch.log(torch.exp(pos_sim) / torch.exp(sim_matrix).sum(dim=1))
-        return loss.mean()
+# XML을 YOLO 형식의 TXT로 변환
+convert_xml_to_yolo_format(input_xml_path, converted_txt_path)
 
-    def train_contrastive(self, images_folder, epochs=1, batch_size=4, save_path="/home/jovyan/data-vol-1/Result/SimYOLO/simclr_backbone_trained.pth"):
-        augmentation = T.Compose([
-            T.Resize((640, 640)),  # 모든 이미지를 640x640 크기로 조정
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-            T.GaussianBlur(kernel_size=5),
-            T.RandomAdjustSharpness(sharpness_factor=2),
-            T.RandomPerspective(distortion_scale=0.5, p=0.5),
-            T.ToTensor(),
-        ])
-        
-        dataset = CustomDataset(images_folder, transform=augmentation, contrastive=True)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        
-        for epoch in range(epochs):
-            total_loss = 0
-            for img1, img2 in data_loader:
-                self.optimizer.zero_grad()
-                z_i = self.model(img1)
-                z_j = self.model(img2)
-                loss = self.contrastive_loss(z_i, z_j)
-                loss.backward()
-                self.optimizer.step()
-                total_loss += loss.item()
-            
-            print(f"Epoch [{epoch+1}/{epochs}], Contrastive Loss: {total_loss/len(data_loader)}")
-        
-        # SimCLR 대조 학습 가중치 저장
-        torch.save(self.model.encoder.state_dict(), save_path)
-        print(f"SimCLR backbone saved to {save_path}")
-
-    def train_yolo(self, yolo_weights_path, images_folder, labels_folder, epochs=1, batch_size=4, save_path="/home/jovyan/data-vol-1/Result/SimYOLO/yolo_trained_params.pth"):
-        self.yolo = YOLO("v11", custom_backbone=self.model.encoder)
-        self.yolo.model.load_state_dict(torch.load(yolo_weights_path))
-        
-        augmentation = T.Compose([
-            T.Resize((640, 640)),  # 모든 이미지를 640x640 크기로 조정
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-            T.ToTensor(),
-        ])
-        
-        dataset = CustomDataset(images_folder, labels_folder, transform=augmentation)
-        data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        
-        self.optimizer = optim.Adam(self.yolo.model.parameters(), lr=0.001)
-        
-        for epoch in range(epochs):
-            total_loss = 0
-            for images, labels in data_loader:
-                self.optimizer.zero_grad()
-                outputs = self.yolo.model(images)
-                loss = self.calculate_loss(outputs, labels)
-                loss.backward()
-                self.optimizer.step()
-                total_loss += loss.item()
-            
-            print(f"Epoch [{epoch+1}/{epochs}], YOLO Loss: {total_loss/len(data_loader)}")
-        
-        # YOLO 학습 가중치 저장
-        torch.save(self.yolo.model.state_dict(), save_path)
-        print(f"YOLO model parameters saved to {save_path}")
-
-    def calculate_loss(self, outputs, labels):
-        return torch.nn.MSELoss()(outputs, labels)
-
-# 학습 실행 예시
-if __name__ == "__main__":
-    simclr_backbone_path = "/home/jovyan/resnet_pretrain/resnet50.pth"
-    yolo_weights_path = "/home/jovyan/yolo11obb/yolo11m-obb.pt"
-    images_folder = "/home/jovyan/data-vol-1/dataset/train/images"
-    labels_folder = "/home/jovyan/data-vol-1/dataset/train/labels"
-    
-    trainer = SimCLRTrainer()
-    trainer.train_contrastive(images_folder=images_folder, epochs=1, batch_size=4, save_path="/home/jovyan/data-vol-1/Result/SimYOLO/simclr_backbone_trained.pth")
-    trainer.train_yolo(yolo_weights_path=yolo_weights_path, images_folder=images_folder, labels_folder=labels_folder, epochs=1, batch_size=4, save_path="/home/jovyan/data-vol-1/Result/SimYOLO/yolo_trained_params.pth")
-
-
+# 클래스 위치 정보와 변환된 계측 정보를 병합
+combine_txt_files(class_location_txt, converted_txt_path, output_combined_txt)
