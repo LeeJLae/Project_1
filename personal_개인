@@ -1,41 +1,10 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 128, in <module>
+  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 147, in <module>
     test_model('avg')
-  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 95, in test_model
+  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 104, in test_model
     angles = calculate_angles_from_obb(result.obb)
-  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 38, in calculate_angles_from_obb
-    if obb is None or obb.boxes is None:  # OBB 객체가 없거나 박스가 없을 경우
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/utils/__init__.py", line 219, in __getattr__
-    raise AttributeError(f"'{name}' object has no attribute '{attr}'. See valid attributes below.\n{self.__doc__}")
-AttributeError: 'OBB' object has no attribute 'boxes'. See valid attributes below.
-
-    A class for storing and manipulating Oriented Bounding Boxes (OBB).
-
-    This class provides functionality to handle oriented bounding boxes, including conversion between
-    different formats, normalization, and access to various properties of the boxes.
-
-    Attributes:
-        data (torch.Tensor): The raw OBB tensor containing box coordinates and associated data.
-        orig_shape (tuple): Original image size as (height, width).
-        is_track (bool): Indicates whether tracking IDs are included in the box data.
-        xywhr (torch.Tensor | numpy.ndarray): Boxes in [x_center, y_center, width, height, rotation] format.
-        conf (torch.Tensor | numpy.ndarray): Confidence scores for each box.
-        cls (torch.Tensor | numpy.ndarray): Class labels for each box.
-        id (torch.Tensor | numpy.ndarray): Tracking IDs for each box, if available.
-        xyxyxyxy (torch.Tensor | numpy.ndarray): Boxes in 8-point [x1, y1, x2, y2, x3, y3, x4, y4] format.
-        xyxyxyxyn (torch.Tensor | numpy.ndarray): Normalized 8-point coordinates relative to orig_shape.
-        xyxy (torch.Tensor | numpy.ndarray): Axis-aligned bounding boxes in [x1, y1, x2, y2] format.
-
-    Methods:
-        cpu(): Returns a copy of the OBB object with all tensors on CPU memory.
-        numpy(): Returns a copy of the OBB object with all tensors as numpy arrays.
-        cuda(): Returns a copy of the OBB object with all tensors on GPU memory.
-        to(*args, **kwargs): Returns a copy of the OBB object with tensors on specified device and dtype.
-
-    Examples:
-        >>> boxes = torch.tensor([[100, 50, 150, 100, 30, 0.9, 0]])  # xywhr, conf, cls
-        >>> obb = OBB(boxes, orig_shape=(480, 640))
-        >>> print(obb.xyxyxyxy)
-        >>> print(obb.conf)
-        >>> print(obb.cls)
-    
+  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 45, in calculate_angles_from_obb
+    points = sorted([(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords), 2)], key=lambda p: p[1])
+  File "/home/jovyan/jonglae/Retry1/MainModel/YOLO/2_YOLO_Detect_Mea/1_basic/1_2_ResultImage_DO.py", line 45, in <listcomp>
+    points = sorted([(float(coords[i]), float(coords[i+1])) for i in range(0, len(coords), 2)], key=lambda p: p[1])
+TypeError: only length-1 arrays can be converted to Python scalars
