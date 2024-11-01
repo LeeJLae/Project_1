@@ -1,44 +1,99 @@
+
+##############################################################################
+## 1. 위치 기반 손실 함수 가중치 설정 -> 좌측 하단 또는 하단
+## 2. 위치 히트맵 적용
+##############################################################################
+# txt 파일에는 class 위치랑 계측 값 정보를 넣음
+# 
+
+from ultralytics import YOLO
 import os
 import xml.etree.ElementTree as ET
 import re
 
-# XML 파일을 YOLO 형식의 TXT로 변환하는 함수
-def convert_xml_to_yolo_format(input_xml_path, output_txt_path):
+# 외부 YOLO 모델 로드
+external_model = YOLO('/path/to/external_yolo_model.pt')
+
+# 데이터셋 및 결과 저장 경로 설정
+yaml_file = '/path/to/dataset_config.yaml'  # 학습에 필요한 YAML 파일 경로
+output_dir = '/path/to/output/directory'    # 학습 결과를 저장할 디렉토리
+os.makedirs(output_dir, exist_ok=True)
+
+# XML 파일을 YOLO OBB 형식으로 변환하여 하나의 TXT 파일로 저장하는 함수
+def save_yolo_format_from_xml(input_xml_path, output_txt_path):
     tree = ET.parse(input_xml_path)
     root = tree.getroot()
     
     with open(output_txt_path, 'w') as f:
         for elem in root.iter("text"):
-            # `<text>` 태그에서 2자리 또는 3자리 정수 값 추출
+            # `<text>` 태그에서 계측 값을 추출
             match = re.search(r'\b\d{2,3}\b', elem.text)
             if match:
                 value = int(match.group())
-                # 예시: 클래스 ID 0, 중심_x 0.5, 중심_y 0.5, 너비와 높이는 추출한 값을 100으로 나눈 값, 각도 0
-                f.write(f"0 0.5 0.5 {value / 100} {value / 100} 0\n")
+                # 클래스 ID 0 (계측 정보)
+                x1, y1 = 0.4, 0.4  # 예시 좌표
+                x2, y2 = 0.6, 0.4
+                x3, y3 = 0.6, 0.6
+                x4, y4 = 0.4, 0.6
+                f.write(f"0 {x1} {y1} {x2} {y2} {x3} {y3} {x4} {y4}\n")
+                
+                # 클래스 ID 1 (위치 정보)
+                # 이 부분은 사용자가 필요에 따라 설정
+                x1, y1 = 0.5, 0.5  # 예시 좌표
+                x2, y2 = 0.7, 0.5
+                x3, y3 = 0.7, 0.7
+                x4, y4 = 0.5, 0.7
+                f.write(f"1 {x1} {y1} {x2} {y2} {x3} {y3} {x4} {y4}\n")
     
-    print(f"Converted XML to YOLO format TXT at: {output_txt_path}")
+    print(f"Saved YOLO format TXT at: {output_txt_path}")
 
-# 클래스 위치 정보와 계측 정보를 병합하는 함수
-def combine_txt_files(class_location_txt, measurement_txt, output_combined_txt):
-    with open(class_location_txt, 'r') as class_file, open(measurement_txt, 'r') as measure_file, open(output_combined_txt, 'w') as output_file:
-        # 클래스 위치 정보 병합
-        for class_line in class_file:
-            output_file.write(class_line)
-        
-        # 계측 정보 병합
-        for measure_line in measure_file:
-            output_file.write(measure_line)
+# 모델 학습 함수
+def train_external_yolo_model():
+    external_model.train(
+        data=yaml_file,
+        epochs=50,
+        imgsz=640,
+        batch=16,
+        lr0=0.001,
+        device='cuda',
+        project=output_dir,
+        name='external_yolo_training'
+    )
+    print("외부 YOLO 모델 학습이 완료되었습니다.")
+
+# 학습 실행
+train_external_yolo_model()
+
+# 학습 후 모델 저장
+external_model.save(os.path.join(output_dir, 'external_yolo_trained.pt'))
+
+# 테스트 시 기준 바운딩 박스 크기 `W`, `H` 추출
+def test_external_yolo_model():
+    test_image_folder = '/path/to/test/images'
+    results_folder = os.path.join(output_dir, 'test_results')
+    os.makedirs(results_folder, exist_ok=True)
+
+    # 결과 저장 파일 경로 설정
+    wh_results_path = os.path.join(results_folder, 'wh_results.txt')
     
-    print(f"Combined file created at: {output_combined_txt}")
+    results = external_model.predict(
+        source=test_image_folder,
+        save=True,
+        project=results_folder,
+        name="external_yolo_test"
+    )
+    
+    # 테스트 결과에서 기준 크기 `W`, `H` 저장
+    with open(wh_results_path, 'w') as f:
+        for result in results:
+            image_name = os.path.basename(result.path)
+            for bbox in result.boxes:
+                if int(bbox.cls) == 0:  # 단일 클래스 기준 바운딩 박스
+                    w = bbox.xyxy[2] - bbox.xyxy[0]
+                    h = bbox.xyxy[3] - bbox.xyxy[1]
+                    f.write(f"Image {image_name}, W: {w:.2f}, H: {h:.2f}\n")
+    
+    print(f"WH results saved to: {wh_results_path}")
 
-# 경로 설정
-input_xml_path = '/path/to/input.xml'             # XML 파일 경로
-converted_txt_path = '/path/to/measurement.txt'   # 변환된 계측 정보 TXT 파일 경로
-class_location_txt = '/path/to/class_location.txt' # 클래스 위치 정보 TXT 파일 경로
-output_combined_txt = '/path/to/output_combined.txt' # 병합된 출력 파일 경로
-
-# XML을 YOLO 형식의 TXT로 변환
-convert_xml_to_yolo_format(input_xml_path, converted_txt_path)
-
-# 클래스 위치 정보와 변환된 계측 정보를 병합
-combine_txt_files(class_location_txt, converted_txt_path, output_combined_txt)
+# 테스트 실행
+test_external_yolo_model()
