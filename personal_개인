@@ -1,100 +1,276 @@
-from ultralytics import YOLO
+# 변경점
+# 1) output image 빈칸 채우기 : 평균 픽셀값
+# 2) Interpolation 다양화 : Bicubic & Lanczos
+# -> 
+
+
 import os
-import cv2
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
 import numpy as np
-from scipy.ndimage import rotate
+import cv2
+import random
+from scipy import stats
+import torchvision.models as models
 
-# 절대 경로로 WEIGHTS_PATH 정의
-WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/2Step_yolov11m/2Step_2nd.pt"
+# ResNet Bottleneck Block 정의
+class Bottleneck(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv3 = nn.Conv2d(out_channels, out_channels * 4, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_channels * 4)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels * 4:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels * 4, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels * 4)
+            )
 
-# 수평 맞춤을 위한 회전 각도 계산
-def calculate_horizontal_rotation(obb_points):
-    bottom_left = obb_points[0]
-    bottom_right = obb_points[1]
-
-    # OBB의 각도 계산
-    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1], bottom_right[0] - bottom_left[0]))
-
-    # 각도를 -45도에서 45도 사이로 조정하여 뒤집힘 방지
-    if obb_angle < -45:
-        obb_angle += 90
-    elif obb_angle > 45:
-        obb_angle -= 90
+    def forward(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out = F.relu(self.bn2(self.conv2(out)))
+        out = self.bn3(self.conv3(out))
+        out += self.shortcut(x)
+        out = F.relu(out)
+        return out
         
-    return obb_angle
+class EnhancedRotNetWithResNet(nn.Module):
+    def __init__(self):
+        super(EnhancedRotNetWithResNet, self).__init__()
+        self.resnet = models.resnet50(pretrained=False)
+        self.resnet.fc = nn.Identity()
+        self.fc1 = nn.Linear(2048, 128)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(128, 64)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc3 = nn.Linear(64, 1)
 
-# 중앙 기준으로 Scipy의 rotate 함수를 사용해 이미지 회전
-def rotate_image_scipy(image, angle):
-    # Scipy의 rotate 함수는 중심 기준 회전을 자동으로 수행
-    rotated_image = rotate(image, angle, reshape=False)
-    return rotated_image
+    def forward(self, x):
+        x = self.resnet(x)
+        x = torch.relu(self.fc1(x))
+        x = self.dropout1(x)
+        x = torch.relu(self.fc2(x))
+        x = self.dropout2(x)
+        x = self.fc3(x)
+        return x
 
-# 모델 테스트 함수
-def test_model():
-    # 테스트 이미지 및 결과 폴더 경로 설정
-    test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
-    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_Counts'
-     
-    results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
-    os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
 
-    # YOLO 모델 로드
-    model = YOLO(WEIGHTS_PATH)
 
-    # 모델 예측
-    results = model.predict(
-        source=test_image_folder,  # 테스트할 이미지 폴더 경로
-        save=True,                 # 결과 이미지를 저장
-        project=results_folder,    # 저장할 기본 디렉토리
-        name="1STEP_YOLO_result"   # 결과를 저장할 하위 폴더 이름
-    )
 
-    # 클래스별 OBB 위치를 저장할 TXT 파일 경로 설정
-    bbox_results_path = os.path.join(results_folder, 'bounding_boxes.txt')
-    with open(bbox_results_path, 'w') as f:
-        for result in results:
-            image_name = os.path.basename(result.path)  # 이미지 이름
-            f.write(f"Image: {image_name}\n")  # 이미지 이름 기록
-            image = cv2.imread(result.path)  # 원본 이미지 읽기
-            image_height, image_width = image.shape[:2]  # 이미지 사이즈
-            
-            # 예측된 OBB 정보 처리
-            if result.obb is not None:
-                print(f"OBB for {image_name}: {result.obb.xyxyxyxy}")  # OBB 정보 출력
+# 이미지 크기 맞추기 함수
+def resize_and_pad(image, target_size=(128, 128)):
+    h, w = image.shape[:2]
+    scale = min(target_size[0] / h, target_size[1] / w)
+    new_w, new_h = int(w * scale), int(h * scale)
+    resized_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+    pad_w = (target_size[1] - new_w) // 2
+    pad_h = (target_size[0] - new_h) // 2
+    padded_image = cv2.copyMakeBorder(resized_image, pad_h, target_size[0] - new_h - pad_h,
+                                      pad_w, target_size[1] - new_w - pad_w,
+                                      cv2.BORDER_CONSTANT, value=[0, 0, 0])
+    return padded_image
+
+# 데이터셋 클래스 정의
+# 각도 리스트를 설정해주는 함수
+def generate_unique_rotations(num_rotations, rotation_range=(-50, 50), min_angle_diff=1.5):
+    angles = []
+    while len(angles) < num_rotations:
+        angle = random.uniform(*rotation_range)
+        if all(abs(angle - a) >= min_angle_diff for a in angles):
+            angles.append(angle)
+    return angles
+
+# 회전 함수
+def rotate_image(image, angle):
+    (h, w) = image.shape[:2]
+    center = (w // 2, h // 2)
+    
+    # 이미지의 평균 픽셀 값 계산
+    avg_pixel_value = int(np.mean(image))
+    # 이미지의 가장 많이 나온 픽셀 값 계산
+    most_pixel_value = int(stats.mode(image, axis=None)[0])
+
+    # 회전 행렬 생성
+    M = cv2.getRotationMatrix2D(center, angle, 1.0)
+    
+    # 회전 이미지 생성 (빈 공간을 평균 픽셀 값으로 채움)
+    rotated = cv2.warpAffine(image, M, (w, h), borderMode=cv2.BORDER_CONSTANT, borderValue=avg_pixel_value)
+    # Bicubic
+    # rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=avg_pixel_value)
+    # Lanczos 
+    # rotated = cv2.warpAffine(image, M, (w, h), flags=cv2.INTER_LANCZOS4, borderMode=cv2.BORDER_CONSTANT, borderValue=avg_pixel_value)
+    
+    return rotated
+
+# 밝기 조절 함수
+def adjust_brightness(image, factor):
+    return cv2.convertScaleAbs(image, alpha=factor, beta=0)
+
+# 랜덤 크롭 함수
+def random_crop(image, crop_size=(100, 100)):
+    h, w = image.shape[:2]
+    crop_h, crop_w = crop_size
+    if h > crop_h and w > crop_w:
+        top = random.randint(0, h - crop_h)
+        left = random.randint(0, w - crop_w)
+        return image[top:top + crop_h, left:left + crop_w]
+    else:
+        return image  # 크롭이 불가능하면 원본을 그대로 반환
+
+# 데이터셋 클래스에서 augment_images 함수에 적용
+class RotNetDataset(Dataset):
+    def __init__(self, folder_path, num_augmentations=30, rotation_range=(-50,50), crop_size=(100, 100), brightness_range=(0.5, 1.5)):
+        self.images = self.load_images(folder_path)
+        self.num_augmentations = num_augmentations
+        self.rotation_range = rotation_range
+        self.crop_size = crop_size
+        self.brightness_range = brightness_range
+        self.augmented_data = self.augment_images()
+
+    def load_images(self, folder_path):
+        images = []
+        for filename in os.listdir(folder_path):
+            if filename.endswith(('.png', '.jpg', '.jpeg','.JPG')):
+                image = cv2.imread(os.path.join(folder_path, filename), cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)  # 기존 resize_and_pad 함수 사용
+                images.append(image)
+        return images
+
+    def augment_images(self):
+        augmented_images = []
+        for image in self.images:
+            angles = generate_unique_rotations(self.num_augmentations, self.rotation_range, min_angle_diff=0.3)
+            for angle in angles:
+                # 1. 회전
+                rotated_image = rotate_image(image, angle)
                 
-                class_ids = result.obb.cls  # 클래스 ID 가져오기
-                obb_coordinates = result.obb.xyxyxyxy  # OBB 좌표 정보
+                # 2. 밝기 조절 (0.5 ~ 1.5 배 밝기 조정)
+                brightness_factor = random.uniform(*self.brightness_range)
+                bright_image = adjust_brightness(rotated_image, brightness_factor)
+                
+                # 3. 랜덤 크롭
+                cropped_image = random_crop(bright_image, self.crop_size)
+                
+                # 최종 증강 이미지를 추가
+                augmented_images.append((cropped_image, angle))
+        return augmented_images
 
-                # 각 클래스에 대해 모든 OBB 좌표를 반복하여 기록
-                for i in range(len(class_ids)):
-                    cls = int(class_ids[i].item())  # 클래스 ID 가져오기
+    def __len__(self):
+        return len(self.augmented_data)
 
-                    # 클래스 1(CA) 또는 클래스 5(CB)만 고려
-                    if cls in [1, 5]:
-                        points = obb_coordinates[i].cpu().numpy()  # OBB 좌표
+    def __getitem__(self, idx):
+        image, angle = self.augmented_data[idx]
+        image = torch.tensor(image, dtype=torch.float32).unsqueeze(0) / 255.0
+        angle = torch.tensor(angle, dtype=torch.float32)
+        return image, angle
 
-                        # OBB 좌표에서 회전 각도 계산
-                        rotation_angle = calculate_horizontal_rotation(points)
+# 모델 학습 함수 정의
+def train_model(model, train_loader, num_epochs=40, tolerance=1.0):
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-                        # 중앙 기준으로 Scipy 회전 적용
-                        rotated_image = rotate_image_scipy(image, rotation_angle)
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        correct_predictions = 0
+        total_predictions = 0
 
-                        # 회전된 이미지 저장
-                        output_image_path = os.path.join(results_folder, f"rotated_horizontal_{image_name}")
-                        cv2.imwrite(output_image_path, rotated_image)
-                        print(f"Rotated horizontal image saved to: {output_image_path}")
+        for images, angles in train_loader:
+            images, angles = images.to(device), angles.to(device)
 
-                        # 좌표를 문자열로 변환
-                        points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
-                        f.write(f'Class: {cls}, OBB Points: {points_str}, Rotation Angle: {rotation_angle:.2f} degrees\n')  # 모든 B-BOX 좌표 기록
-                        
-            else:
-                f.write("No OBB detected.\n")  # 감지된 OBB가 없는 경우 기록
+            optimizer.zero_grad()
+            outputs = model(images).squeeze()
+            loss = criterion(outputs, angles)
+            loss.backward()
+            optimizer.step()
 
-            f.write("\n")  # 각 이미지 블록 사이에 줄 추가
+            running_loss += loss.item()
 
-    print(f"Test results saved to: {results_folder}")
-    print(f"Bounding boxes saved to: {bbox_results_path}")
+            # Accuracy 계산
+            diff = torch.abs(outputs - angles)
+            correct_predictions += torch.sum(diff <= tolerance).item()
+            total_predictions += len(angles)
+        
+        accuracy = (correct_predictions / total_predictions) * 100
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / len(train_loader):.4f}, Accuracy: {accuracy:.2f}%")
 
-# 테스트 실행
-test_model()
+    # 모델 파라미터 저장
+    save_path_for_para = '/home/jovyan/Rotation_new20_Resnet_e40_a30.pth'  # 더 단순한 경로 사용
+    folder_path = os.path.dirname(save_path_for_para)
+
+# 폴더가 없으면 생성
+    os.makedirs(folder_path, exist_ok=True)
+
+# 모델 저장
+    torch.save(model.state_dict(), save_path_for_para)
+    print(f"모델이 '{save_path_for_para}'에 저장되었습니다.")
+
+# Test 및 이미지 저장 함수 정의
+def test_and_save_images(model, test_folder, save_path='images_new20_Resnet_e40_a30'):
+    corrected_path = os.path.join(save_path, 'corrected_images')
+    rotated_path = os.path.join(save_path, 'rotated_images')
+    
+    os.makedirs(corrected_path, exist_ok=True)
+    os.makedirs(rotated_path, exist_ok=True)
+
+    model.eval()
+    with torch.no_grad():
+        for filename in os.listdir(test_folder):
+            if filename.endswith(('.png', '.jpg', '.jpeg','.JPG')):
+                image_path = os.path.join(test_folder, filename)
+                image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+                image = resize_and_pad(image)
+                image_tensor = torch.tensor(image, dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 255.0
+
+                image_tensor = image_tensor.to(device)
+
+                predicted_angle = model(image_tensor).item()
+
+                corrected_image = rotate_image(image, -predicted_angle)
+                save_filename = os.path.join(corrected_path, f"{filename.split('.')[0]}_corrected.png")
+                cv2.imwrite(save_filename, corrected_image)
+
+                rotated_save_filename = os.path.join(rotated_path, f"{filename.split('.')[0]}_angle_{predicted_angle:.2f}.png")
+                cv2.imwrite(rotated_save_filename, image)
+                
+                print(f"{filename} - Predicted Angle: {predicted_angle:.2f}")
+
+# 데이터셋 및 모델 초기화
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+model = EnhancedRotNetWithResNet()
+
+
+train_folder = '/home/jovyan/gen_new_train_images'
+test_folder = '/home/jovyan/test_image'
+
+train_dataset = RotNetDataset(train_folder)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+
+# 모델 학습
+train_model(model, train_loader)
+
+# Test 및 결과 저장
+test_and_save_images(model, test_folder)
+
+
+##############
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"Using device: {device}")
+model = EnhancedRotNetWithResNet().to(device)
+
+# 파라미터 로드 및 적용
+state_dict = torch.load(f"./model/~~~.pth", map_location="cpu")
+state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+state_dict = {'patch_embed.backbone.' + k: v for k, v in state_dict.items()}
+msg = model.load_state_dict(state_dict, strict=False)
+print('weight loading message:', msg)
