@@ -1,33 +1,37 @@
-#세로축을 세운다
-
-
-
 from ultralytics import YOLO
 import os
 import cv2
 import numpy as np
+from scipy.ndimage import rotate
 
 # 절대 경로로 WEIGHTS_PATH 정의
-WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/1STEP_yolov11m/1STEP_yolov11m.pt"
+WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/2Step_yolov11m/2Step_2nd.pt"
 
-# OBB를 수직으로 맞추기 위한 회전 각도 계산
-def calculate_vertical_rotation(obb_points):
+# 수평 맞춤을 위한 회전 각도 계산
+def calculate_horizontal_rotation(obb_points):
     bottom_left = obb_points[0]
     bottom_right = obb_points[1]
 
     # OBB의 각도 계산
-    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1],
-                                        bottom_right[0] - bottom_left[0]))
+    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1], bottom_right[0] - bottom_left[0]))
 
-    # OBB가 수직이 되도록 회전할 각도 계산
-    if obb_angle < 0:
-        return -obb_angle  # 시계 방향으로 회전
-    else:
-        return -obb_angle  # 시계 방향으로 회전
+    # 각도를 -45도에서 45도 사이로 조정하여 뒤집힘 방지
+    if obb_angle < -45:
+        obb_angle += 90
+    elif obb_angle > 45:
+        obb_angle -= 90
+        
+    return obb_angle
+
+# 중앙 기준으로 Scipy의 rotate 함수를 사용해 이미지 회전
+def rotate_image_scipy(image, angle):
+    # Scipy의 rotate 함수는 중심 기준 회전을 자동으로 수행
+    rotated_image = rotate(image, angle, reshape=False)
+    return rotated_image
 
 # 모델 테스트 함수
 def test_model():
-    # 테스트 이미지 및 정답 레이블 폴더 경로 설정
+    # 테스트 이미지 및 결과 폴더 경로 설정
     test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
     output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_Counts'
      
@@ -69,18 +73,16 @@ def test_model():
                     if cls in [1, 5]:
                         points = obb_coordinates[i].cpu().numpy()  # OBB 좌표
 
-                        # OBB를 수직으로 맞추기 위한 회전 각도 계산
-                        rotation_angle = calculate_vertical_rotation(points)
+                        # OBB 좌표에서 회전 각도 계산
+                        rotation_angle = calculate_horizontal_rotation(points)
 
-                        # OBB를 수직으로 맞추기 위한 회전 적용
-                        center = (int((points[0][0] + points[2][0]) / 2), int((points[0][1] + points[2][1]) / 2))  # OBB의 중심
-                        rotation_matrix = cv2.getRotationMatrix2D(center, rotation_angle, 1.0)
-                        rotated_image = cv2.warpAffine(image, rotation_matrix, (image_width, image_height))
+                        # 중앙 기준으로 Scipy 회전 적용
+                        rotated_image = rotate_image_scipy(image, rotation_angle)
 
                         # 회전된 이미지 저장
-                        output_image_path = os.path.join(results_folder, f"rotated_vertical_{image_name}")
+                        output_image_path = os.path.join(results_folder, f"rotated_horizontal_{image_name}")
                         cv2.imwrite(output_image_path, rotated_image)
-                        print(f"Rotated vertical image saved to: {output_image_path}")
+                        print(f"Rotated horizontal image saved to: {output_image_path}")
 
                         # 좌표를 문자열로 변환
                         points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
