@@ -1,7 +1,6 @@
-for result in results:
-    if result is not None:
-        obb_boxes = result.obb.xyxy  # For OBB models
-        for obb_box in obb_boxes:
-            print(f"OBB Box: {obb_box}")
-    else:
-        print("No detections.")
+predictions = model.predict('path/to/test/images')
+for pred in predictions:
+    with open(f'results/{pred.image_name}.txt', 'w') as f:
+        for bbox in pred.boxes:
+            line = f"{pred.class_name} {bbox.conf} {bbox.x1} {bbox.y1} {bbox.x2} {bbox.y2} {bbox.x3} {bbox.y3} {bbox.x4} {bbox.y4}\n"
+            f.write(line)
