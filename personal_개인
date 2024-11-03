@@ -1,14 +1,35 @@
+#세로축을 세운다
+
+
+
 from ultralytics import YOLO
 import os
+import cv2
+import numpy as np
 
 # 절대 경로로 WEIGHTS_PATH 정의
 WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/1STEP_yolov11m/1STEP_yolov11m.pt"
+
+# OBB를 수직으로 맞추기 위한 회전 각도 계산
+def calculate_vertical_rotation(obb_points):
+    bottom_left = obb_points[0]
+    bottom_right = obb_points[1]
+
+    # OBB의 각도 계산
+    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1],
+                                        bottom_right[0] - bottom_left[0]))
+
+    # OBB가 수직이 되도록 회전할 각도 계산
+    if obb_angle < 0:
+        return -obb_angle  # 시계 방향으로 회전
+    else:
+        return -obb_angle  # 시계 방향으로 회전
 
 # 모델 테스트 함수
 def test_model():
     # 테스트 이미지 및 정답 레이블 폴더 경로 설정
     test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
-    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/base_ALL'
+    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_Counts'
      
     results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
     os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
@@ -30,6 +51,8 @@ def test_model():
         for result in results:
             image_name = os.path.basename(result.path)  # 이미지 이름
             f.write(f"Image: {image_name}\n")  # 이미지 이름 기록
+            image = cv2.imread(result.path)  # 원본 이미지 읽기
+            image_height, image_width = image.shape[:2]  # 이미지 사이즈
             
             # 예측된 OBB 정보 처리
             if result.obb is not None:
@@ -39,14 +62,30 @@ def test_model():
                 obb_coordinates = result.obb.xyxyxyxy  # OBB 좌표 정보
 
                 # 각 클래스에 대해 모든 OBB 좌표를 반복하여 기록
-                for i in range(len(class_ids)):  # 각 OBB에 대해 반복
+                for i in range(len(class_ids)):
                     cls = int(class_ids[i].item())  # 클래스 ID 가져오기
-                    points = obb_coordinates[i]  # OBB 좌표
 
-                    # 좌표를 문자열로 변환
-                    points_str = ', '.join([f'({points[j][0].item()}, {points[j][1].item()})' for j in range(len(points))])
-                    f.write(f'Class: {cls}, OBB Points: {points_str}\n')  # 모든 B-BOX 좌표 기록
-                    
+                    # 클래스 1(CA) 또는 클래스 5(CB)만 고려
+                    if cls in [1, 5]:
+                        points = obb_coordinates[i].cpu().numpy()  # OBB 좌표
+
+                        # OBB를 수직으로 맞추기 위한 회전 각도 계산
+                        rotation_angle = calculate_vertical_rotation(points)
+
+                        # OBB를 수직으로 맞추기 위한 회전 적용
+                        center = (int((points[0][0] + points[2][0]) / 2), int((points[0][1] + points[2][1]) / 2))  # OBB의 중심
+                        rotation_matrix = cv2.getRotationMatrix2D(center, rotation_angle, 1.0)
+                        rotated_image = cv2.warpAffine(image, rotation_matrix, (image_width, image_height))
+
+                        # 회전된 이미지 저장
+                        output_image_path = os.path.join(results_folder, f"rotated_vertical_{image_name}")
+                        cv2.imwrite(output_image_path, rotated_image)
+                        print(f"Rotated vertical image saved to: {output_image_path}")
+
+                        # 좌표를 문자열로 변환
+                        points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
+                        f.write(f'Class: {cls}, OBB Points: {points_str}, Rotation Angle: {rotation_angle:.2f} degrees\n')  # 모든 B-BOX 좌표 기록
+                        
             else:
                 f.write("No OBB detected.\n")  # 감지된 OBB가 없는 경우 기록
 
