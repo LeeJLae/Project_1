@@ -39,7 +39,7 @@ def test_model():
                 obb_coordinates = result.obb.xyxyxyxy  # OBB 좌표 정보
 
                 for i in range(len(class_ids)):  # 각 OBB에 대해 반복
-                    cls = class_ids[i].item()  # 클래스 ID 가져오기
+                    cls = int(class_ids[i].item())  # 클래스 ID 가져오기
                     points = obb_coordinates[i]  # OBB 좌표
 
                     # 좌표를 문자열로 변환
