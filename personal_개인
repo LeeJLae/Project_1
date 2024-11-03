@@ -1,58 +1,29 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/Main/MODE_1_Rotation/1_1_Base_Training.py", line 13, in <module>
-    model.train(
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/model.py", line 802, in train
-    self.trainer.train()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 207, in train
-    self._do_train(world_size)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/engine/trainer.py", line 385, in _do_train
-    self.loss, self.loss_items = self.model(batch)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/tasks.py", line 110, in forward
-    return self.loss(x, *args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/tasks.py", line 291, in loss
-    preds = self.forward(batch["img"]) if preds is None else preds
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/tasks.py", line 111, in forward
-    return self.predict(x, *args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/tasks.py", line 129, in predict
-    return self._predict_once(x, profile, visualize, embed)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/tasks.py", line 150, in _predict_once
-    x = m(x)  # run
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/modules/head.py", line 209, in forward
-    x = Detect.forward(self, x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/modules/head.py", line 64, in forward
-    x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/container.py", line 250, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/container.py", line 250, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/ultralytics/nn/modules/conv.py", line 50, in forward
-    return self.act(self.bn(self.conv(x)))
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/activation.py", line 432, in forward
-    return F.silu(input, inplace=self.inplace)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/functional.py", line 2379, in silu
-    return torch._C._nn.silu_(input)
-RuntimeError: NVML_SUCCESS == r INTERNAL ASSERT FAILED at "../c10/cuda/CUDACachingAllocator.cpp":995, please report a bug to PyTorch. 
+def test_model():
+    results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
+    os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
+    
+    results = model.predict(
+        source=test_image_folder,  # 테스트할 이미지 폴더 경로
+        save=True,                 # 결과 이미지를 저장
+        project=output_dir,        # 저장할 기본 디렉토리
+        name="1STEP_YOLO_result"   # 결과를 저장할 하위 폴더 이름
+    )
+    print(f"Test results saved to: {results_folder}")
+    
+    # IoU 결과 저장할 파일 경로 설정
+    iou_results_path = os.path.join(results_folder, 'iou_results.txt')
+    with open(iou_results_path, 'w') as f:
+        for result in results:
+            image_name = os.path.basename(result.path)  # 이미지 이름
+            ground_truths = load_ground_truth_boxes(label_folder, image_name)  # 정답 바운딩 박스 불러오기
+            predictions = result.boxes.xyxy if result.boxes is not None else []  # 예측 바운딩 박스
+            
+            # IoU 계산 및 저장
+            for gt_box, pred_box in zip(ground_truths, predictions):
+                iou = calculate_iou(gt_box, pred_box.tolist())
+                f.write(f"IoU for {result.path}: {iou:.4f}\n")
+    
+    print(f"IoU results saved to: {iou_results_path}")
+
+# 테스트 실행
+test_model()
