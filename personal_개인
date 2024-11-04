@@ -3,19 +3,36 @@ import pytesseract
 import cv2
 import re
 import os
+import numpy as np
 
 # YOLO 모델 로드 (학습된 가중치 사용)
 weight_path = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt'  # 학습된 가중치 파일 경로
 model = YOLO(weight_path)
 
 # OCR 설정 및 나노미터 단위 텍스트 필터링 정규 표현식
-nm_pattern = re.compile(r'(\d{2,3})\s*nm')  # 2~3자리 숫자 뒤에 "nm"이 오는 형식
+nm_pattern = re.compile(r'(\d{1,4})\s*[nN][mM]')  # 1~4자리 숫자 뒤에 "nm" 또는 "NM"이 오는 형식
 
 # 나노미터 측정 텍스트 인식 함수
 def detect_nm_text(image, bbox):
-    x1, y1, x2, y2 = map(int, bbox)
-    roi = image[y1:y2, x1:x2]  # 바운딩 박스 영역 선택
-    text = pytesseract.image_to_string(roi)
+    # bbox가 8개의 좌표 (x1, y1, x2, y2, x3, y3, x4, y4)로 주어지므로
+    # 최소 및 최대 x, y 좌표를 찾아 (x_min, y_min) ~ (x_max, y_max) 형태로 변환
+    x_coords = bbox[::2].cpu().numpy()  # x 좌표들
+    y_coords = bbox[1::2].cpu().numpy()  # y 좌표들
+    x_min, x_max = int(np.min(x_coords)), int(np.max(x_coords))
+    y_min, y_max = int(np.min(y_coords)), int(np.max(y_coords))
+    
+    roi = image[y_min:y_max, x_min:x_max]  # 바운딩 박스 영역 선택
+    
+    # 이진화 처리로 텍스트를 선명하게 만듦
+    _, roi_thresh = cv2.threshold(roi, 128, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    
+    # 블러링 처리 추가
+    roi_blur = cv2.GaussianBlur(roi_thresh, (5, 5), 0)
+
+    # OCR 적용 (숫자 인식을 위한 psm 옵션 7 사용)
+    text = pytesseract.image_to_string(roi_blur, config='--psm 7')
+    print(f"OCR detected text: {text}")  # OCR 결과를 직접 출력하여 검토
+
     match = nm_pattern.search(text)
     if match:
         return int(match.group(1))  # "nm" 단위 앞의 숫자를 반환
@@ -31,6 +48,7 @@ def test_yolo_with_ocr(model, test_image_folder, output_folder):
     # 테스트 이미지 처리
     results = model.predict(
         source=test_image_folder,  # 테스트 이미지 폴더
+        conf=0.25,                 # 탐지 임계값 낮춤
         save=True,                 # 결과 이미지를 저장
         project=output_folder,     # 저장할 기본 디렉토리
         name="test_results"        # 결과 저장할 하위 폴더 이름
@@ -47,11 +65,12 @@ def test_yolo_with_ocr(model, test_image_folder, output_folder):
             # 이미지 크기 기록
             txt_file.write(f"Image: {image_name}, Size: {image_width}x{image_height}\n")
 
-            for box in result.boxes:  # 탐지된 모든 바운딩 박스에 대해
-                class_id = int(box.cls)  # 클래스 ID
-                bbox = box.xyxy[0].tolist()  # 바운딩 박스 좌표
-                w_pixels = bbox[2] - bbox[0]
-                h_pixels = bbox[3] - bbox[1]
+            for bbox, class_id in zip(result.obb.xyxyxyxy, result.obb.cls):  # 탐지된 모든 바운딩 박스에 대해
+                class_id = int(class_id)  # 클래스 ID
+                x_coords = bbox[::2].cpu().numpy()
+                y_coords = bbox[1::2].cpu().numpy()
+                w_pixels = np.max(x_coords) - np.min(x_coords)
+                h_pixels = np.max(y_coords) - np.min(y_coords)
 
                 # 바운딩 박스 내 텍스트에서 "nm" 단위 필터링
                 nm_value = detect_nm_text(image, bbox)
@@ -62,13 +81,13 @@ def test_yolo_with_ocr(model, test_image_folder, output_folder):
 
                     # 결과 기록
                     txt_file.write(
-                        f"Class: {class_id}, BBox: {bbox}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
+                        f"Class: {class_id}, BBox: {bbox.cpu().numpy()}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
                         f"W_nm: {w_nm}, H_nm: {h_nm:.2f}\n"
                     )
                 else:
                     # nm 단위 텍스트가 없을 경우 픽셀 단위만 기록
                     txt_file.write(
-                        f"Class: {class_id}, BBox: {bbox}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
+                        f"Class: {class_id}, BBox: {bbox.cpu().numpy()}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
                         "W_nm: None, H_nm: None\n"
                     )
     print(f"Detection results saved to: {txt_output_path}")
