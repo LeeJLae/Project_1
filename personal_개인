@@ -1,98 +1,27 @@
 from ultralytics import YOLO
-import pytesseract
-import cv2
-import re
 import os
-import numpy as np
 
-# YOLO 모델 로드 (학습된 가중치 사용)
-weight_path = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt'  # 학습된 가중치 파일 경로
-model = YOLO(weight_path)
+# YOLO 모델 로드 (기존 가중치 사용)
+model = YOLO('/home/jovyan/data-vol-1/Result/2_Measure/YOLO/BB_weight/2Step_yolov11m/2Step_2nd.pt')  # 사전 학습된 가중치 파일 경로
 
-# OCR 설정 및 나노미터 단위 텍스트 필터링 정규 표현식
-nm_pattern = re.compile(r'(\d{1,4})\s*[nN][mM]')  # 1~4자리 숫자 뒤에 "nm" 또는 "NM"이 오는 형식
+# 증강된 데이터셋 경로를 정의한 .yaml 파일 경로
+train_data = '/home/jovyan/data-vol-1/Y_T_Data/YOLO_WB.yaml'  # 증강된 데이터셋의 yaml 파일 경로
 
-# 나노미터 측정 텍스트 인식 함수
-def detect_nm_text(image, bbox):
-    # bbox가 8개의 좌표 (x1, y1, x2, y2, x3, y3, x4, y4)로 주어지므로
-    # 최소 및 최대 x, y 좌표를 찾아 (x_min, y_min) ~ (x_max, y_max) 형태로 변환
-    x_coords = bbox[::2].cpu().numpy()  # x 좌표들
-    y_coords = bbox[1::2].cpu().numpy()  # y 좌표들
-    x_min, x_max = int(np.min(x_coords)), int(np.max(x_coords))
-    y_min, y_max = int(np.min(y_coords)), int(np.max(y_coords))
-    
-    roi = image[y_min:y_max, x_min:x_max]  # 바운딩 박스 영역 선택
-    
-    # 이진화 처리로 텍스트를 선명하게 만듦
-    _, roi_thresh = cv2.threshold(roi, 128, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    
-    # 블러링 처리 추가
-    roi_blur = cv2.GaussianBlur(roi_thresh, (5, 5), 0)
+# 학습 결과를 저장할 디렉토리 생성
+output_dir = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
+os.makedirs(output_dir, exist_ok=True)
 
-    # OCR 적용 (숫자 인식을 위한 psm 옵션 7 사용)
-    text = pytesseract.image_to_string(roi_blur, config='--psm 7')
-    print(f"OCR detected text: {text}")  # OCR 결과를 직접 출력하여 검토
+# YOLO 학습 실행
+model.train(
+    data=train_data,
+    epochs=1,               # 에포크 수 지정
+    imgsz=640,
+    batch=16,
+    lr0=0.001,               # 초기 학습률 설정왜 O
+    device='cuda',
+    amp=False,
+    val=False
+)
 
-    match = nm_pattern.search(text)
-    if match:
-        return int(match.group(1))  # "nm" 단위 앞의 숫자를 반환
-    return None
-
-# 테스트 및 결과 저장 함수
-def test_yolo_with_ocr(model, test_image_folder, output_folder):
-    results_folder = os.path.join(output_folder, 'test_results')
-    os.makedirs(results_folder, exist_ok=True)
-
-    txt_output_path = os.path.join(results_folder, 'detection_results.txt')
-
-    # 테스트 이미지 처리
-    results = model.predict(
-        source=test_image_folder,  # 테스트 이미지 폴더
-        conf=0.25,                 # 탐지 임계값 낮춤
-        save=True,                 # 결과 이미지를 저장
-        project=output_folder,     # 저장할 기본 디렉토리
-        name="test_results"        # 결과 저장할 하위 폴더 이름
-    )
-    print(f"Test results saved to: {results_folder}")
-
-    # 결과 TXT 파일 생성
-    with open(txt_output_path, 'w') as txt_file:
-        for result in results:
-            image_name = os.path.basename(result.path)
-            image = cv2.imread(result.path, cv2.IMREAD_GRAYSCALE)
-            image_height, image_width = image.shape[:2]
-
-            # 이미지 크기 기록
-            txt_file.write(f"Image: {image_name}, Size: {image_width}x{image_height}\n")
-
-            for bbox, class_id in zip(result.obb.xyxyxyxy, result.obb.cls):  # 탐지된 모든 바운딩 박스에 대해
-                class_id = int(class_id)  # 클래스 ID
-                x_coords = bbox[::2].cpu().numpy()
-                y_coords = bbox[1::2].cpu().numpy()
-                w_pixels = np.max(x_coords) - np.min(x_coords)
-                h_pixels = np.max(y_coords) - np.min(y_coords)
-
-                # 바운딩 박스 내 텍스트에서 "nm" 단위 필터링
-                nm_value = detect_nm_text(image, bbox)
-                if nm_value is not None:
-                    # 나노미터 기준 비례 계산
-                    w_nm = nm_value
-                    h_nm = h_pixels * (w_nm / w_pixels)
-
-                    # 결과 기록
-                    txt_file.write(
-                        f"Class: {class_id}, BBox: {bbox.cpu().numpy()}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
-                        f"W_nm: {w_nm}, H_nm: {h_nm:.2f}\n"
-                    )
-                else:
-                    # nm 단위 텍스트가 없을 경우 픽셀 단위만 기록
-                    txt_file.write(
-                        f"Class: {class_id}, BBox: {bbox.cpu().numpy()}, W_pixels: {w_pixels}, H_pixels: {h_pixels}, "
-                        "W_nm: None, H_nm: None\n"
-                    )
-    print(f"Detection results saved to: {txt_output_path}")
-
-# 실행 예제
-test_image_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'  # 테스트 이미지 폴더 경로
-output_folder = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
-test_yolo_with_ocr(model, test_image_folder, output_folder)
+# 학습된 모델 저장Eh
+model.save(os.path.join(output_dir, 'YOLO_WB.pt'))
