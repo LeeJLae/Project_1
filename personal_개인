@@ -1,27 +1,94 @@
-from ultralytics import YOLO
 import os
+import cv2
+import numpy as np
+import re
 
-# YOLO 모델 로드 (기존 가중치 사용)
-model = YOLO('/home/jovyan/data-vol-1/Result/2_Measure/YOLO/BB_weight/2Step_yolov11m/2Step_2nd.pt')  # 사전 학습된 가중치 파일 경로
+# 바운딩 박스를 회전하는 함수
+def rotate_bbox(bbox, angle, original_shape, new_shape, offset):
+    orig_h, orig_w = original_shape[:2]
+    new_h, new_w = new_shape[:2]
+    
+    # 좌표를 절대 좌표로 변환하고 오프셋 적용
+    points = np.array([
+        [bbox[0] * orig_w + offset[0], bbox[1] * orig_h + offset[1]],
+        [bbox[2] * orig_w + offset[0], bbox[3] * orig_h + offset[1]],
+        [bbox[4] * orig_w + offset[0], bbox[5] * orig_h + offset[1]],
+        [bbox[6] * orig_w + offset[0], bbox[7] * orig_h + offset[1]]
+    ], dtype=np.float32)
+    
+    # 회전 중심 설정 및 좌표 회전
+    center = (new_w / 2, new_h / 2)
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+    rotated_points = cv2.transform(np.array([points]), rotation_matrix)[0]
+    
+    # 새 이미지 크기에 맞게 정규화 후 반환
+    rotated_points[:, 0] = np.clip(rotated_points[:, 0] / new_w, 0, 1)
+    rotated_points[:, 1] = np.clip(rotated_points[:, 1] / new_h, 0, 1)
+    
+    return rotated_points.flatten().tolist()
 
-# 증강된 데이터셋 경로를 정의한 .yaml 파일 경로
-train_data = '/home/jovyan/data-vol-1/Y_T_Data/YOLO_WB.yaml'  # 증강된 데이터셋의 yaml 파일 경로
+# 이미지 및 바운딩 박스 회전 후 저장하는 함수
+def augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees=(-40, 40), scale_factor=1.0):
+    image = cv2.imread(image_path)
+    bboxes = []
+    
+    # TXT 파일에서 바운딩 박스 읽기
+    with open(txt_path, 'r') as f:
+        for line in f:
+            values = list(map(float, line.strip().split()))
+            class_id = int(values[0])
+            obb_coords = values[1:]
+            bboxes.append([class_id] + obb_coords)
+    
+    orig_h, orig_w, _ = image.shape
+    new_w, new_h = int(orig_w * scale_factor), int(orig_h * scale_factor)
+    padded_image = np.zeros((new_h, new_w, 3), dtype=np.uint8)
+    
+    # 이미지 중앙 배치 및 오프셋 계산
+    x_offset = (new_w - orig_w) // 2
+    y_offset = (new_h - orig_h) // 2
+    padded_image[y_offset:y_offset+orig_h, x_offset:x_offset+orig_w] = image
+    offset = (x_offset, y_offset)
+    
+    base_num = re.search(r'\d+', os.path.basename(image_path)).group(0)
 
-# 학습 결과를 저장할 디렉토리 생성
-output_dir = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
-os.makedirs(output_dir, exist_ok=True)
+    for degree in range(degrees[0], degrees[1] + 1):
+        rotation_matrix = cv2.getRotationMatrix2D((new_w / 2, new_h / 2), degree, 1.0)
+        rotated_image = cv2.warpAffine(padded_image, rotation_matrix, (new_w, new_h))
+        
+        filename = f"{base_num}_rot{degree}"
+        rotated_image_path = os.path.join(output_image_dir, f"{filename}.png")
+        output_txt_path = os.path.join(output_txt_dir, f"{filename}.txt")
+        
+        cv2.imwrite(rotated_image_path, rotated_image)
+        
+        # 바운딩 박스 회전 후 저장
+        with open(output_txt_path, 'w') as f:
+            for bbox in bboxes:
+                class_id = bbox[0]
+                obb_coords = bbox[1:]
+                rotated_obb_coords = rotate_bbox(obb_coords, degree, image.shape, padded_image.shape, offset)
+                f.write(f"{class_id} {' '.join(map(str, rotated_obb_coords))}\n")
 
-# YOLO 학습 실행
-model.train(
-    data=train_data,
-    epochs=1,               # 에포크 수 지정
-    imgsz=640,
-    batch=16,
-    lr0=0.001,               # 초기 학습률 설정왜 O
-    device='cuda',
-    amp=False,
-    val=False
-)
+# 디렉토리 내 모든 이미지 및 TXT 파일 증강
+def process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, degrees=(-40, 40), scale_factor=1.0):
+    os.makedirs(output_image_dir, exist_ok=True)
+    os.makedirs(output_txt_dir, exist_ok=True)
+    
+    for image_file in os.listdir(image_dir):
+        if image_file.endswith('.png') or image_file.endswith('.jpg'):
+            image_path = os.path.join(image_dir, image_file)
+            txt_path = os.path.join(txt_dir, image_file.replace('.png', '.txt').replace('.jpg', '.txt'))
+            
+            if os.path.exists(txt_path):
+                augment_and_save(image_path, txt_path, output_image_dir, output_txt_dir, degrees, scale_factor)
 
-# 학습된 모델 저장Eh
-model.save(os.path.join(output_dir, 'YOLO_WB.pt'))
+
+image_dir = '/home/jovyan/MODE1_DATASET/WB_Data/Images'  # 원본 이미지 경로
+txt_dir = '/home/jovyan/MODE1_DATASET/WB_Data/labels_8'    # YOLO OBB 형식의 TXT 파일 경로
+output_image_dir = '/home/jovyan/data-vol-1/dataset_WB/train/images'  # 증강 이미지 저장 경로
+output_txt_dir = '/home/jovyan/data-vol-1/dataset_WB/train/labels'    # 증강 TXT 파일 저장 경로
+
+# -50도 ~ 50도 범위 증강 실행
+process_directory(image_dir, txt_dir, output_image_dir, output_txt_dir, degrees=(-40, 40), scale_factor=2.0)
+
