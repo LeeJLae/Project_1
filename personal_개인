@@ -1,24 +1,77 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 13, in <module>
-    reader = easyocr.Reader(['en'], gpu=False)  # 원하는 언어로 설정 가능 (예: ['ko', 'en'])
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/easyocr.py", line 92, in __init__
-    detector_path = self.getDetectorPath(detect_network)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/easyocr.py", line 253, in getDetectorPath
-    download_and_unzip(self.detection_models[self.detect_network]['url'], self.detection_models[self.detect_network]['filename'], self.model_storage_directory, self.verbose)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/utils.py", line 628, in download_and_unzip
-    urlretrieve(url, zip_path, reporthook=reporthook)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 241, in urlretrieve
-    with contextlib.closing(urlopen(url, data)) as fp:
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 216, in urlopen
-    return opener.open(url, data, timeout)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 519, in open
-    response = self._open(req, data)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 536, in _open
-    result = self._call_chain(self.handle_open, protocol, protocol +
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 496, in _call_chain
-    result = func(*args)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 1391, in https_open
-    return self.do_open(http.client.HTTPSConnection, req,
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 1351, in do_open
-    raise URLError(err)
-urllib.error.URLError: <urlopen error [Errno 104] Connection reset by peer>
+# 출력은 단순히 class 0의 8개 좌표와 class 1을 ocr하여 얻은 나노미터 기준 값
+# class 1의 경우 OCR을 통해 얻은 나노미터 기준값은 제목 옆에 붙도록
+# class 0만 기존 yolo obb 데이터 형식(class & 좌표 8개)으로 적히게 해줘
+
+
+from ultralytics import YOLO
+import os
+import cv2
+import numpy as np
+import easyocr
+
+# easyocr Reader 객체 생성
+reader = easyocr.Reader(['en'], gpu=False)  # 원하는 언어로 설정 가능 (예: ['ko', 'en'])
+
+# 절대 경로로 WEIGHTS_PATH 정의
+WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt"
+
+# OCR을 사용해 텍스트 값을 추출
+def extract_text_with_ocr(image, bbox):
+    # OBB 좌표 8개에서 x, y 좌표를 분리하여 배열 생성
+    x_coords = bbox[::2]  # bbox의 짝수 인덱스는 x 좌표
+    y_coords = bbox[1::2]  # bbox의 홀수 인덱스는 y 좌표
+
+    # 최소/최대 x, y 좌표를 계산
+    x_min, x_max = int(np.min(x_coords)), int(np.max(x_coords))
+    y_min, y_max = int(np.min(y_coords)), int(np.max(y_coords))
+
+    # 바운딩 박스 영역으로 이미지 자르기
+    cropped_image = image[y_min:y_max, x_min:x_max]
+
+    # OCR 수행
+    results = reader.readtext(cropped_image)
+    if results:
+        return results[0][1].strip()  # 첫 번째 검출된 텍스트 반환
+    return ""  # 텍스트 검출이 안 될 경우 빈 문자열 반환
+
+# 모델 테스트 함수
+def test_model():
+    test_image_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'
+    output_txt_path = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/bounding_boxes.txt'
+    
+    model = YOLO(WEIGHTS_PATH)
+
+    # 결과 저장할 텍스트 파일 생성
+    with open(output_txt_path, 'w') as f:
+        for image_file in os.listdir(test_image_folder):
+            image_path = os.path.join(test_image_folder, image_file)
+            image = cv2.imread(image_path)
+            
+            # 이미지에서 예측 수행
+            results = model.predict(source=image_path)
+
+            # 이미지 제목 기록
+            image_name = os.path.basename(image_path)
+            f.write(f"Image: {image_name}")
+
+            # 클래스 0과 클래스 1 처리
+            for result in results:
+                for i, cls in enumerate(result.obb.cls):
+                    if int(cls) == 1:  # 클래스 1의 텍스트 감지 영역을 OCR로 처리
+                        bbox = result.obb.xyxyxyxy[i].cpu().numpy()
+                        ocr_text = extract_text_with_ocr(image, bbox)
+                        f.write(f" ({ocr_text} nm)")  # OCR로 얻은 텍스트를 제목 옆에 기록
+                    elif int(cls) == 0:  # 클래스 0의 좌표 8개 형식 기록
+                        obb_points = result.obb.xyxyxyxy[i].cpu().numpy().reshape(-1, 2)
+                        obb_coords = ", ".join([f"({x:.2f}, {y:.2f})" for x, y in obb_points])
+                        f.write(f"\nClass 0 OBB: 0 {obb_coords}")
+            
+            f.write("\n\n")  # 다음 이미지로 넘어가기 전 줄바꿈
+
+    print(f"Bounding boxes saved to: {output_txt_path}")
+
+# 테스트 실행
+test_model()
+
+
+
