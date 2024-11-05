@@ -1,8 +1,24 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 63, in <module>
-    test_model()
-  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 51, in test_model
-    ocr_text = extract_text_with_ocr(image, bbox)
-  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 18, in extract_text_with_ocr
-    x_min, y_min = int(bbox[0]), int(bbox[1])
-TypeError: only length-1 arrays can be converted to Python scalars
+  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 13, in <module>
+    reader = easyocr.Reader(['en'], gpu=False)  # 원하는 언어로 설정 가능 (예: ['ko', 'en'])
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/easyocr.py", line 92, in __init__
+    detector_path = self.getDetectorPath(detect_network)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/easyocr.py", line 253, in getDetectorPath
+    download_and_unzip(self.detection_models[self.detect_network]['url'], self.detection_models[self.detect_network]['filename'], self.model_storage_directory, self.verbose)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/utils.py", line 628, in download_and_unzip
+    urlretrieve(url, zip_path, reporthook=reporthook)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 241, in urlretrieve
+    with contextlib.closing(urlopen(url, data)) as fp:
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 216, in urlopen
+    return opener.open(url, data, timeout)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 519, in open
+    response = self._open(req, data)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 536, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 496, in _call_chain
+    result = func(*args)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 1391, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/urllib/request.py", line 1351, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [Errno 104] Connection reset by peer>
