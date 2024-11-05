@@ -1,5 +1,5 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/4_WB_OCR_Train.py", line 21, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/OCR_Test.py", line 21, in <module>
     detector = get_detector(WEIGHT_PATH, device=device)
   File "/home/jovyan/STN/EasyOCR/easyocr/detection.py", line 85, in get_detector
     net.load_state_dict(copyStateDict(torch.load(trained_model, map_location=device, weights_only=False)))
