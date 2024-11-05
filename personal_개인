@@ -1,10 +1,102 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/OCR_Test.py", line 21, in <module>
-    detector = get_detector(WEIGHT_PATH, device=device)
-  File "/home/jovyan/STN/EasyOCR/easyocr/detection.py", line 85, in get_detector
-    net.load_state_dict(copyStateDict(torch.load(trained_model, map_location=device, weights_only=False)))
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2584, in load_state_dict
-    raise RuntimeError(
-RuntimeError: Error(s) in loading state_dict for CRAFT:
-        Missing key(s) in state_dict: "basenet.slice1.0.weight", "basenet.slice1.0.bias", "basenet.slice1.1.weight", "basenet.slice1.1.bias", "basenet.slice1.1.running_mean", "basenet.slice1.1.running_var", "basenet.slice1.3.weight", "basenet.slice1.3.bias", "basenet.slice1.4.weight", "basenet.slice1.4.bias", "basenet.slice1.4.running_mean", "basenet.slice1.4.running_var", "basenet.slice1.7.weight", "basenet.slice1.7.bias", "basenet.slice1.8.weight", "basenet.slice1.8.bias", "basenet.slice1.8.running_mean", "basenet.slice1.8.running_var", "basenet.slice1.10.weight", "basenet.slice1.10.bias", "basenet.slice1.11.weight", "basenet.slice1.11.bias", "basenet.slice1.11.running_mean", "basenet.slice1.11.running_var", "basenet.slice2.14.weight", "basenet.slice2.14.bias", "basenet.slice2.15.weight", "basenet.slice2.15.bias", "basenet.slice2.15.running_mean", "basenet.slice2.15.running_var", "basenet.slice2.17.weight", "basenet.slice2.17.bias", "basenet.slice2.18.weight", "basenet.slice2.18.bias", "basenet.slice2.18.running_mean", "basenet.slice2.18.running_var", "basenet.slice3.20.weight", "basenet.slice3.20.bias", "basenet.slice3.21.weight", "basenet.slice3.21.bias", "basenet.slice3.21.running_mean", "basenet.slice3.21.running_var", "basenet.slice3.24.weight", "basenet.slice3.24.bias", "basenet.slice3.25.weight", "basenet.slice3.25.bias", "basenet.slice3.25.running_mean", "basenet.slice3.25.running_var", "basenet.slice3.27.weight", "basenet.slice3.27.bias", "basenet.slice3.28.weight", "basenet.slice3.28.bias", "basenet.slice3.28.running_mean", "basenet.slice3.28.running_var", "basenet.slice4.30.weight", "basenet.slice4.30.bias", "basenet.slice4.31.weight", "basenet.slice4.31.bias", "basenet.slice4.31.running_mean", "basenet.slice4.31.running_var", "basenet.slice4.34.weight", "basenet.slice4.34.bias", "basenet.slice4.35.weight", "basenet.slice4.35.bias", "basenet.slice4.35.running_mean", "basenet.slice4.35.running_var", "basenet.slice4.37.weight", "basenet.slice4.37.bias", "basenet.slice4.38.weight", "basenet.slice4.38.bias", "basenet.slice4.38.running_mean", "basenet.slice4.38.running_var", "basenet.slice5.1.weight", "basenet.slice5.1.bias", "basenet.slice5.2.weight", "basenet.slice5.2.bias", "upconv1.conv.0.weight", "upconv1.conv.0.bias", "upconv1.conv.1.weight", "upconv1.conv.1.bias", "upconv1.conv.1.running_mean", "upconv1.conv.1.running_var", "upconv1.conv.3.weight", "upconv1.conv.3.bias", "upconv1.conv.4.weight", "upconv1.conv.4.bias", "upconv1.conv.4.running_mean", "upconv1.conv.4.running_var", "upconv2.conv.0.weight", "upconv2.conv.0.bias", "upconv2.conv.1.weight", "upconv2.conv.1.bias", "upconv2.conv.1.running_mean", "upconv2.conv.1.running_var", "upconv2.conv.3.weight", "upconv2.conv.3.bias", "upconv2.conv.4.weight", "upconv2.conv.4.bias", "upconv2.conv.4.running_mean", "upconv2.conv.4.running_var", "upconv3.conv.0.weight", "upconv3.conv.0.bias", "upconv3.conv.1.weight", "upconv3.conv.1.bias", "upconv3.conv.1.running_mean", "upconv3.conv.1.running_var", "upconv3.conv.3.weight", "upconv3.conv.3.bias", "upconv3.conv.4.weight", "upconv3.conv.4.bias", "upconv3.conv.4.running_mean", "upconv3.conv.4.running_var", "upconv4.conv.0.weight", "upconv4.conv.0.bias", "upconv4.conv.1.weight", "upconv4.conv.1.bias", "upconv4.conv.1.running_mean", "upconv4.conv.1.running_var", "upconv4.conv.3.weight", "upconv4.conv.3.bias", "upconv4.conv.4.weight", "upconv4.conv.4.bias", "upconv4.conv.4.running_mean", "upconv4.conv.4.running_var", "conv_cls.0.weight", "conv_cls.0.bias", "conv_cls.2.weight", "conv_cls.2.bias", "conv_cls.4.weight", "conv_cls.4.bias", "conv_cls.6.weight", "conv_cls.6.bias", "conv_cls.8.weight", "conv_cls.8.bias". 
-        Unexpected key(s) in state_dict: "date", "version", "license", "docs", "epoch", "best_fitness", "model", "ema", "updates", "optimizer", "train_args", "train_metrics", "train_results". 
+import cv2
+import re
+import os
+import torch
+import sys
+
+# 절대 경로 지정
+
+MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
+WEIGHT_PATH = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt'
+RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/craft_mlt_25k.pth'
+
+# EasyOCR detection 및 recognition 파일 불러오기
+sys.path.append(MODULE_PATH)
+
+from detection import get_textbox, get_detector  # DETECTION에서 감지 함수 가져오기
+from recognition import get_text, get_recognizer  # RECOGNITION에서 OCR 함수 가져오기
+
+# YOLO 모델 초기화
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+detector = get_detector(WEIGHT_PATH, device=device)
+
+# OCR 모델 초기화
+character = '0123456789nm'  # OCR에 사용할 문자 집합
+recognizer, converter = get_recognizer(
+    recog_network='generation1',
+    network_params={'input_channel': 1, 'output_channel': 512, 'hidden_size': 256},
+    character=character,
+    separator_list=[],
+    dict_list=[],
+    model_path=RECOGNITION_WEIGHT_PATH,
+    device=device
+)
+
+def process_yolo_and_ocr(image, detector, recognizer, converter):
+    """
+    YOLO 데이터를 OBB 형식으로 처리하고, OCR로 나노미터 기준값 추출
+    """
+    output = []
+
+    # YOLO 감지 결과 가져오기
+    yolo_data = get_textbox(
+        detector, image, canvas_size=1280, mag_ratio=1.5,
+        text_threshold=0.7, link_threshold=0.4, low_text=0.4,
+        poly=False, device=device
+    )
+
+    for polys in yolo_data:
+        for poly in polys:
+            class_id = 0  # 예시: Class 0으로 설정
+            coords = poly  # 좌표는 OBB 형식의 8개 좌표
+
+            # OCR 수행
+            min_x, max_x = min(coords[0::2]), max(coords[0::2])
+            min_y, max_y = min(coords[1::2]), max(coords[1::2])
+            cropped_image = image[min_y:max_y, min_x:max_x]
+            ocr_result = get_text(
+                character=character, imgH=32, imgW=100,
+                recognizer=recognizer, converter=converter,
+                image_list=[((0, 0), cropped_image)], device=device
+            )
+
+            # OCR 결과에서 나노미터 값 추출
+            text, confidence = ocr_result[0][1], ocr_result[0][2]
+            nm_value = re.search(r'\d+ ?nm', text)
+            nm_value = nm_value.group() if nm_value else "N/A"
+
+            # 결과 형식에 맞게 추가
+            if class_id == 0:
+                output.append(f"{class_id} " + " ".join(map(str, coords)))
+            else:
+                output.append(f"Class 1 ({nm_value})")
+
+    return output
+
+def process_folder(input_folder, output_folder):
+    """
+    폴더 내의 모든 이미지에 대해 YOLO 데이터 처리 및 결과 저장
+    """
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+    
+    for filename in os.listdir(input_folder):
+        if filename.endswith(('.jpg', '.png')):
+            image_path = os.path.join(input_folder, filename)
+            image = cv2.imread(image_path)
+            
+            # YOLO 및 OCR 처리
+            processed_output = process_yolo_and_ocr(image, detector, recognizer, converter)
+            
+            # 결과를 텍스트 파일에 저장
+            output_path = os.path.join(output_folder, f"{filename.split('.')[0]}_output.txt")
+            with open(output_path, 'w') as f:
+                for line in processed_output:
+                    f.write(line + '\n')
+
+# 입력 및 출력 폴더 경로
+input_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'
+output_folder = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
+
+# 폴더 내 이미지 처리 시작
+process_folder(input_folder, output_folder)
