@@ -1,120 +1,68 @@
 from ultralytics import YOLO
-import os
+import pytesseract
 import cv2
-import numpy as np
-from scipy.ndimage import rotate
+import re
+import os
 
-# 절대 경로로 WEIGHTS_PATH 정의
-WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/2Step_yolov11m/2Step_2nd.pt"
+# 학습된 YOLO 모델 로드
+weight_path = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt'  # 학습된 모델 가중치 경로
+model = YOLO(weight_path)
 
-# 수평 맞춤을 위한 회전 각도 계산
-def calculate_horizontal_rotation(obb_points):
-    bottom_left = obb_points[0]
-    bottom_right = obb_points[1]
+# OCR 설정 및 나노미터 단위 텍스트 필터링 정규 표현식
+nm_pattern = re.compile(r'(\d+)\s*n\s*m', re.IGNORECASE)  # "nm" 또는 "NM"이 포함된 텍스트 필터링
 
-    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1], bottom_right[0] - bottom_left[0]))
+# 텍스트 클래스의 바운딩 박스에 OCR 적용 및 나노미터 인식 함수
+def detect_nm_text(image, bbox):
+    x1, y1, x2, y2 = map(int, bbox)  # YOLO 바운딩 박스 좌표
+    roi = image[y1:y2, x1:x2]        # 텍스트 영역 선택 (ROI)
 
-    if obb_angle < -45:
-        obb_angle += 90
-    elif obb_angle > 45:
-        obb_angle -= 90
-        
-    return obb_angle
+    # OCR 적용
+    text = pytesseract.image_to_string(roi, config='--psm 6')
+    print(f"OCR detected text: {text}")  # OCR 결과 확인
 
-# 중앙 기준으로 Scipy의 rotate 함수를 사용해 이미지 회전
-def rotate_image_scipy(image, angle):
-    rotated_image = rotate(image, angle, reshape=False)
-    return rotated_image
+    # nm 텍스트 필터링 및 값 추출
+    match = nm_pattern.search(text)
+    if match:
+        return int(match.group(1))  # "nm" 단위 앞의 숫자 반환
+    return None
 
-# 모델 테스트 함수
-def test_model():
-    test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
-    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_WB'
-     
-    results_folder = os.path.join(output_dir, 'Result')
+# YOLO 및 OCR 결과 저장 함수
+def test_yolo_with_ocr(model, test_image_folder, output_folder):
+    results_folder = os.path.join(output_folder, 'test_results')
     os.makedirs(results_folder, exist_ok=True)
 
-    model = YOLO(WEIGHTS_PATH)
+    txt_output_path = os.path.join(results_folder, 'detection_results.txt')
 
-    results = model.predict(
-        source=test_image_folder,
-        save=True,
-        project=results_folder,
-        name="Result"
-    )
+    # 테스트 이미지 처리
+    results = model.predict(source=test_image_folder, save=True, project=output_folder, name="test_results")
+    print(f"Test results saved to: {results_folder}")
 
-    bbox_results_path = os.path.join(results_folder, 'bounding_boxes.txt')
-    with open(bbox_results_path, 'w') as f:
+    # 결과 TXT 파일 생성
+    with open(txt_output_path, 'w') as txt_file:
         for result in results:
             image_name = os.path.basename(result.path)
-            f.write(f"Image: {image_name}")
-
-            # 이미지와 동일한 이름의 txt 파일 로드
-            txt_file_path = os.path.join(test_image_folder, f"{os.path.splitext(image_name)[0]}.txt")
-            class_1_text = None
-            if os.path.exists(txt_file_path):
-                with open(txt_file_path, 'r') as txt_file:
-                    for line in txt_file:
-                        class_id, x, y, w, h = line.strip().split()
-                        if int(class_id) == 1:  # 클래스 1 텍스트 처리
-                            class_1_text = f"Class 1 Text: {x} nm"
-                            f.write(f" ({class_1_text})")  # 이미지 제목 옆에 기록
-                        elif int(class_id) == 0:  # 클래스 0 b-box 회전 적용
-                            class_0_bbox = np.array([[float(x), float(y)],
-                                                     [float(x) + float(w), float(y)],
-                                                     [float(x) + float(w), float(y) + float(h)],
-                                                     [float(x), float(y) + float(h)]])
-            f.write("\n")
-
             image = cv2.imread(result.path)
-            original_image_height, original_image_width = image.shape[:2]
+            txt_file.write(f"Image: {image_name}\n")
 
-            if result.obb is not None:
-                class_ids = result.obb.cls
-                obb_coordinates = result.obb.xyxyxyxy
-                original_bbox_area_sum = 0
-                rotated_bbox_area_sum = 0
+            # 검출된 객체 및 텍스트 클래스 처리
+            for box in result.boxes:
+                class_id = int(box.cls)  # 클래스 ID (객체 또는 텍스트)
+                bbox = box.xyxy[0].tolist()  # 바운딩 박스 좌표
 
-                for i in range(len(class_ids)):
-                    cls = int(class_ids[i].item())
-                    if cls in [1, 5]:
-                        points = obb_coordinates[i].cpu().numpy()
-                        original_bbox_area = cv2.contourArea(points)
-                        original_bbox_area_sum += original_bbox_area
-                        rotation_angle = calculate_horizontal_rotation(points)
-                        rotated_image = rotate_image_scipy(image, rotation_angle)
-                        rotated_image_height, rotated_image_width = rotated_image.shape[:2]
-                        rotated_bbox_area = original_bbox_area
-                        rotated_bbox_area_sum += rotated_bbox_area
-                        output_image_path = os.path.join(results_folder, f"rotated_horizontal_{image_name}")
-                        cv2.imwrite(output_image_path, rotated_image)
-                        points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
-                        f.write(f'Class: {cls}, OBB Points: {points_str}, Rotation Angle: {rotation_angle:.2f} degrees\n')
+                if class_id == 1:  # 텍스트 클래스 ID
+                    nm_value = detect_nm_text(image, bbox)  # OCR로 나노미터 텍스트 확인
+                    if nm_value is not None:
+                        txt_file.write(f"Class: Text, BBox: {bbox}, Detected nm value: {nm_value} nm\n")
+                    else:
+                        txt_file.write(f"Class: Text, BBox: {bbox}, Detected nm value: None\n")
+                else:
+                    txt_file.write(f"Class: Object, BBox: {bbox}\n")
 
-                # 클래스 0 b-box 회전 적용하여 기록
-                if class_0_bbox is not None:
-                    class_0_rotation_angle = calculate_horizontal_rotation(class_0_bbox)
-                    rotated_class_0_bbox = np.dot(class_0_bbox - np.mean(class_0_bbox, axis=0),
-                                                  [[np.cos(np.radians(class_0_rotation_angle)),
-                                                    -np.sin(np.radians(class_0_rotation_angle))],
-                                                   [np.sin(np.radians(class_0_rotation_angle)),
-                                                    np.cos(np.radians(class_0_rotation_angle))]]) + np.mean(class_0_bbox, axis=0)
-                    rotated_bbox_str = ', '.join([f'({pt[0]:.2f}, {pt[1]:.2f})' for pt in rotated_class_0_bbox])
-                    f.write(f"Rotated Class 0 B-BOX: {rotated_bbox_str}, Rotation Angle: {class_0_rotation_angle:.2f} degrees\n")
+    print(f"Detection results saved to: {txt_output_path}")
 
-                f.write(f"Applied Rotation Angle for {image_name}: {rotation_angle:.2f} degrees\n")
-                f.write(f"Original Image Size: {original_image_width}x{original_image_height}\n")
-                f.write(f"Rotated Image Size: {rotated_image_width}x{rotated_image_height}\n")
-                bbox_size_change_ratio = rotated_bbox_area_sum / original_bbox_area_sum if original_bbox_area_sum != 0 else 0
-                f.write(f"B-BOX Size Change Ratio: {bbox_size_change_ratio:.2f}\n")
+# 실행 예제
+test_image_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'  # 테스트 이미지 폴더 경로
+output_folder = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
 
-            else:
-                f.write("No OBB detected.\n")
-
-            f.write("\n")
-
-    print(f"Test results saved to: {results_folder}")
-    print(f"Bounding boxes saved to: {bbox_results_path}")
-
-# 테스트 실행
-test_model()
+# 텍스트 및 객체 검출
+test_yolo_with_ocr(model, test_image_folder, output_folder)
