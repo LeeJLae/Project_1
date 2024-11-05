@@ -5,34 +5,10 @@ Traceback (most recent call last):
     processed_output = process_yolo_and_ocr(image, detector, recognizer, converter)
   File "/home/jovyan/jonglae/Retry1/DO/OCR_Test.py", line 79, in process_yolo_and_ocr
     ocr_result = get_text(
-  File "/home/jovyan/STN/EasyOCR/easyocr/recognition.py", line 198, in get_text
-    result1 = recognizer_predict(recognizer, converter, test_loader, batch_max_length,\
-  File "/home/jovyan/STN/EasyOCR/easyocr/recognition.py", line 107, in recognizer_predict
-    preds = model(image, text_for_pred)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/model/model.py", line 25, in forward
-    visual_feature = self.FeatureExtraction(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/model/modules.py", line 134, in forward
-    return self.ConvNet(input)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/easyocr/model/modules.py", line 231, in forward
-    x = self.conv0_1(x)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1736, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1747, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 554, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 549, in _conv_forward
-    return F.conv2d(
-RuntimeError: Input type (torch.cuda.FloatTensor) and weight type (torch.FloatTensor) should be the same
+  File "/home/jovyan/STN/EasyOCR/easyocr/recognition.py", line 168, in get_text
+    result1 = recognizer_predict(recognizer, converter, test_loader, batch_max_length, ignore_idx, char_group_idx, decoder, beamWidth, device=device)
+  File "/home/jovyan/STN/EasyOCR/easyocr/recognition.py", line 121, in recognizer_predict
+    preds_max_prob = [v[i != 0] if len(v[i != 0]) > 0 else np.array([0]) for v, i in zip(values, indices)]
+  File "/home/jovyan/STN/EasyOCR/easyocr/recognition.py", line 121, in <listcomp>
+    preds_max_prob = [v[i != 0] if len(v[i != 0]) > 0 else np.array([0]) for v, i in zip(values, indices)]
+IndexError: The shape of the mask [26] at index 0 does not match the shape of the indexed tensor [1, 26] at index 0
