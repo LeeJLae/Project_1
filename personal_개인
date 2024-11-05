@@ -1,68 +1,123 @@
+
 from ultralytics import YOLO
-import pytesseract
-import cv2
-import re
 import os
+import cv2
+import numpy as np
+from scipy.ndimage import rotate
 
-# 학습된 YOLO 모델 로드
-weight_path = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB.pt'  # 학습된 모델 가중치 경로
-model = YOLO(weight_path)
+# 절대 경로로 WEIGHTS_PATH 정의
+WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/2Step_yolov11m/2Step_2nd.pt"
 
-# OCR 설정 및 나노미터 단위 텍스트 필터링 정규 표현식
-nm_pattern = re.compile(r'(\d+)\s*n\s*m', re.IGNORECASE)  # "nm" 또는 "NM"이 포함된 텍스트 필터링
+# 수평 맞춤을 위한 회전 각도 계산
+def calculate_horizontal_rotation(obb_points):
+    bottom_left = obb_points[0]
+    bottom_right = obb_points[1]
 
-# 텍스트 클래스의 바운딩 박스에 OCR 적용 및 나노미터 인식 함수
-def detect_nm_text(image, bbox):
-    x1, y1, x2, y2 = map(int, bbox)  # YOLO 바운딩 박스 좌표
-    roi = image[y1:y2, x1:x2]        # 텍스트 영역 선택 (ROI)
+    # OBB의 각도 계산
+    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1], bottom_right[0] - bottom_left[0]))
 
-    # OCR 적용
-    text = pytesseract.image_to_string(roi, config='--psm 6')
-    print(f"OCR detected text: {text}")  # OCR 결과 확인
+    # 각도를 -45도에서 45도 사이로 조정하여 뒤집힘 방지
+    if obb_angle < -45:
+        obb_angle += 90
+    elif obb_angle > 45:
+        obb_angle -= 90
+        
+    return obb_angle
 
-    # nm 텍스트 필터링 및 값 추출
-    match = nm_pattern.search(text)
-    if match:
-        return int(match.group(1))  # "nm" 단위 앞의 숫자 반환
-    return None
+# 중앙 기준으로 Scipy의 rotate 함수를 사용해 이미지 회전
+def rotate_image_scipy(image, angle):
+    # Scipy의 rotate 함수는 중심 기준 회전을 자동으로 수행
+    rotated_image = rotate(image, angle, reshape=False)
+    return rotated_image
 
-# YOLO 및 OCR 결과 저장 함수
-def test_yolo_with_ocr(model, test_image_folder, output_folder):
-    results_folder = os.path.join(output_folder, 'test_results')
-    os.makedirs(results_folder, exist_ok=True)
+# 모델 테스트 함수
+def test_model():
+    # 테스트 이미지 및 결과 폴더 경로 설정
+    test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
+    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_Counts'
+     
+    results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
+    os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
 
-    txt_output_path = os.path.join(results_folder, 'detection_results.txt')
+    # YOLO 모델 로드
+    model = YOLO(WEIGHTS_PATH)
 
-    # 테스트 이미지 처리
-    results = model.predict(source=test_image_folder, save=True, project=output_folder, name="test_results")
-    print(f"Test results saved to: {results_folder}")
+    # 모델 예측
+    results = model.predict(
+        source=test_image_folder,  # 테스트할 이미지 폴더 경로
+        save=True,                 # 결과 이미지를 저장
+        project=results_folder,    # 저장할 기본 디렉토리
+        name="1STEP_YOLO_result"   # 결과를 저장할 하위 폴더 이름
+    )
 
-    # 결과 TXT 파일 생성
-    with open(txt_output_path, 'w') as txt_file:
+    # 클래스별 OBB 위치를 저장할 TXT 파일 경로 설정
+    bbox_results_path = os.path.join(results_folder, 'bounding_boxes.txt')
+    with open(bbox_results_path, 'w') as f:
         for result in results:
-            image_name = os.path.basename(result.path)
-            image = cv2.imread(result.path)
-            txt_file.write(f"Image: {image_name}\n")
+            image_name = os.path.basename(result.path)  # 이미지 이름
+            f.write(f"Image: {image_name}\n")  # 이미지 이름 기록
+            image = cv2.imread(result.path)  # 원본 이미지 읽기
+            original_image_height, original_image_width = image.shape[:2]  # 원본 이미지 사이즈 기록
+            
+            # 예측된 OBB 정보 처리
+            if result.obb is not None:
+                print(f"OBB for {image_name}: {result.obb.xyxyxyxy}")  # OBB 정보 출력
+                
+                class_ids = result.obb.cls  # 클래스 ID 가져오기
+                obb_coordinates = result.obb.xyxyxyxy  # OBB 좌표 정보
 
-            # 검출된 객체 및 텍스트 클래스 처리
-            for box in result.boxes:
-                class_id = int(box.cls)  # 클래스 ID (객체 또는 텍스트)
-                bbox = box.xyxy[0].tolist()  # 바운딩 박스 좌표
+                # 모든 B-BOX의 회전 전 크기 합산 변수 초기화
+                original_bbox_area_sum = 0
+                rotated_bbox_area_sum = 0
 
-                if class_id == 1:  # 텍스트 클래스 ID
-                    nm_value = detect_nm_text(image, bbox)  # OCR로 나노미터 텍스트 확인
-                    if nm_value is not None:
-                        txt_file.write(f"Class: Text, BBox: {bbox}, Detected nm value: {nm_value} nm\n")
-                    else:
-                        txt_file.write(f"Class: Text, BBox: {bbox}, Detected nm value: None\n")
-                else:
-                    txt_file.write(f"Class: Object, BBox: {bbox}\n")
+                # 각 클래스에 대해 모든 OBB 좌표를 반복하여 기록
+                for i in range(len(class_ids)):
+                    cls = int(class_ids[i].item())  # 클래스 ID 가져오기
 
-    print(f"Detection results saved to: {txt_output_path}")
+                    # 클래스 1(CA) 또는 클래스 5(CB)만 고려
+                    if cls in [1, 5]:
+                        points = obb_coordinates[i].cpu().numpy()  # OBB 좌표
 
-# 실행 예제
-test_image_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'  # 테스트 이미지 폴더 경로
-output_folder = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
+                        # 회전 전 B-BOX의 면적 계산
+                        original_bbox_area = cv2.contourArea(points)
+                        original_bbox_area_sum += original_bbox_area
 
-# 텍스트 및 객체 검출
-test_yolo_with_ocr(model, test_image_folder, output_folder)
+                        # OBB 좌표에서 회전 각도 계산
+                        rotation_angle = calculate_horizontal_rotation(points)
+
+                        # 중앙 기준으로 Scipy 회전 적용
+                        rotated_image = rotate_image_scipy(image, rotation_angle)
+                        rotated_image_height, rotated_image_width = rotated_image.shape[:2]  # 회전된 이미지 사이즈
+
+                        # 회전 후 B-BOX의 면적 계산
+                        rotated_bbox_area = original_bbox_area  # 회전 후에도 크기 비율은 동일
+                        rotated_bbox_area_sum += rotated_bbox_area
+
+                        # 회전된 이미지 저장
+                        output_image_path = os.path.join(results_folder, f"rotated_horizontal_{image_name}")
+                        cv2.imwrite(output_image_path, rotated_image)
+                        print(f"Rotated horizontal image saved to: {output_image_path}")
+
+                        # 좌표를 문자열로 변환
+                        points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
+                        f.write(f'Class: {cls}, OBB Points: {points_str}, Rotation Angle: {rotation_angle:.2f} degrees\n')  # 모든 B-BOX 좌표 기록
+
+                # 회전 각도 및 크기 변화 기록
+                f.write(f"Applied Rotation Angle for {image_name}: {rotation_angle:.2f} degrees\n")
+                f.write(f"Original Image Size: {original_image_width}x{original_image_height}\n")
+                f.write(f"Rotated Image Size: {rotated_image_width}x{rotated_image_height}\n")
+                
+                # B-BOX 크기 변화 비율 계산 및 기록
+                bbox_size_change_ratio = rotated_bbox_area_sum / original_bbox_area_sum if original_bbox_area_sum != 0 else 0
+                f.write(f"B-BOX Size Change Ratio: {bbox_size_change_ratio:.2f}\n")
+
+            else:
+                f.write("No OBB detected.\n")  # 감지된 OBB가 없는 경우 기록
+
+            f.write("\n")  # 각 이미지 블록 사이에 줄 추가
+
+    print(f"Test results saved to: {results_folder}")
+    print(f"Bounding boxes saved to: {bbox_results_path}")
+
+# 테스트 실행
+test_model()
