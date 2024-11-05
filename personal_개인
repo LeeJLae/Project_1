@@ -1,127 +1,86 @@
-# 전체 각도 표기
-# 이미지 사이즈 변화 표기
-# b-box 사이즈 변화 표기
-
-
 from ultralytics import YOLO
 import os
-import cv2
-import numpy as np
-from scipy.ndimage import rotate
+from shapely.geometry import Polygon
 
-# 절대 경로로 WEIGHTS_PATH 정의
-WEIGHTS_PATH = "/home/jovyan/data-vol-1/Result/YOLO/2Step_yolov11m/2Step_2nd.pt"
+# YOLO 모델 로드
+model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')
 
-# 수평 맞춤을 위한 회전 각도 계산
-def calculate_horizontal_rotation(obb_points):
-    bottom_left = obb_points[0]
-    bottom_right = obb_points[1]
+# 학습에 사용할 데이터셋 경로를 정의한 .yaml 파일 경로
+train_data = '/home/jovyan/data-vol-1/Y_T_Data/new_obb.yaml'
 
-    # OBB의 각도 계산
-    obb_angle = np.degrees(np.arctan2(bottom_right[1] - bottom_left[1], bottom_right[0] - bottom_left[0]))
+# 학습 결과를 저장할 디렉토리 생성
+output_dir = '/home/jovyan/data-vol-1/Result/YOLO/1STEP_yolov11m'
+os.makedirs(output_dir, exist_ok=True)
 
-    # 각도를 -45도에서 45도 사이로 조정하여 뒤집힘 방지
-    if obb_angle < -45:
-        obb_angle += 90
-    elif obb_angle > 45:
-        obb_angle -= 90
-        
-    return obb_angle
+# IoU 계산 함수
+def calculate_iou(box1, box2):
+    poly1 = Polygon([(box1[i], box1[i+1]) for i in range(0, len(box1), 2)])
+    poly2 = Polygon([(box2[i], box2[i+1]) for i in range(0, len(box2), 2)])
+    if not poly1.is_valid or not poly2.is_valid:
+        return 0.0
+    intersection = poly1.intersection(poly2).area
+    union = poly1.union(poly2).area
+    return intersection / union if union > 0 else 0
 
-# 중앙 기준으로 Scipy의 rotate 함수를 사용해 이미지 회전
-def rotate_image_scipy(image, angle):
-    # Scipy의 rotate 함수는 중심 기준 회전을 자동으로 수행
-    rotated_image = rotate(image, angle, reshape=False)
-    return rotated_image
+# 정답 바운딩 박스를 읽어오는 함수
+def load_ground_truth_boxes(label_folder, image_name):
+    label_path = os.path.join(label_folder, os.path.splitext(image_name)[0] + '.txt')
+    boxes = []
+    if os.path.exists(label_path):
+        with open(label_path, 'r') as f:
+            for line in f.readlines():
+                _, *coords = map(float, line.strip().split())
+                boxes.append(coords)
+    else:
+        print(f"Warning: Ground truth file {label_path} not found.")
+    return boxes
 
-# 모델 테스트 함수
+# 학습 실행
+model.train(
+    data=train_data,
+    epochs=50,               # 전체 에포크 수를 지정
+    imgsz=640,
+    batch=16,
+    lr0=0.001,               # 초기 학습률 설정
+    device='cuda',
+    amp=False,
+    val=False
+)
+
+# 학습된 모델 저장
+model.save(os.path.join(output_dir, '1STEP_yolov11m.pt'))
+
+# 테스트 이미지 및 정답 레이블 폴더 경로 설정
+test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images'
+label_folder = '/home/jovyan/data-vol-1/dataset/test/labels'
+
+# 모델 평가 함수
 def test_model():
-    # 테스트 이미지 및 결과 폴더 경로 설정
-    test_image_folder = '/home/jovyan/data-vol-1/dataset/test/images_test'
-    output_dir = '/home/jovyan/data-vol-1/Result/DataPre/mode_1_rotation/Rotation_Counts'
-     
     results_folder = os.path.join(output_dir, '1STEP_YOLO_result')
     os.makedirs(results_folder, exist_ok=True)  # 결과 폴더가 없으면 생성
-
-    # YOLO 모델 로드
-    model = YOLO(WEIGHTS_PATH)
-
-    # 모델 예측
+    
     results = model.predict(
         source=test_image_folder,  # 테스트할 이미지 폴더 경로
         save=True,                 # 결과 이미지를 저장
-        project=results_folder,    # 저장할 기본 디렉토리
+        project=output_dir,        # 저장할 기본 디렉토리
         name="1STEP_YOLO_result"   # 결과를 저장할 하위 폴더 이름
     )
-
-    # 클래스별 OBB 위치를 저장할 TXT 파일 경로 설정
-    bbox_results_path = os.path.join(results_folder, 'bounding_boxes.txt')
-    with open(bbox_results_path, 'w') as f:
+    print(f"Test results saved to: {results_folder}")
+    
+    # IoU 결과 저장할 파일 경로 설정
+    iou_results_path = os.path.join(results_folder, 'iou_results.txt')
+    with open(iou_results_path, 'w') as f:
         for result in results:
             image_name = os.path.basename(result.path)  # 이미지 이름
-            f.write(f"Image: {image_name}\n")  # 이미지 이름 기록
-            image = cv2.imread(result.path)  # 원본 이미지 읽기
-            original_image_height, original_image_width = image.shape[:2]  # 원본 이미지 사이즈 기록
+            ground_truths = load_ground_truth_boxes(label_folder, image_name)  # 정답 바운딩 박스 불러오기
+            predictions = result.boxes.xyxy if result.boxes is not None else []  # 예측 바운딩 박스
             
-            # 예측된 OBB 정보 처리
-            if result.obb is not None:
-                print(f"OBB for {image_name}: {result.obb.xyxyxyxy}")  # OBB 정보 출력
-                
-                class_ids = result.obb.cls  # 클래스 ID 가져오기
-                obb_coordinates = result.obb.xyxyxyxy  # OBB 좌표 정보
-
-                # 모든 B-BOX의 회전 전 크기 합산 변수 초기화
-                original_bbox_area_sum = 0
-                rotated_bbox_area_sum = 0
-
-                # 각 클래스에 대해 모든 OBB 좌표를 반복하여 기록
-                for i in range(len(class_ids)):
-                    cls = int(class_ids[i].item())  # 클래스 ID 가져오기
-
-                    # 클래스 1(CA) 또는 클래스 5(CB)만 고려
-                    if cls in [1, 5]:
-                        points = obb_coordinates[i].cpu().numpy()  # OBB 좌표
-
-                        # 회전 전 B-BOX의 면적 계산
-                        original_bbox_area = cv2.contourArea(points)
-                        original_bbox_area_sum += original_bbox_area
-
-                        # OBB 좌표에서 회전 각도 계산
-                        rotation_angle = calculate_horizontal_rotation(points)
-
-                        # 중앙 기준으로 Scipy 회전 적용
-                        rotated_image = rotate_image_scipy(image, rotation_angle)
-                        rotated_image_height, rotated_image_width = rotated_image.shape[:2]  # 회전된 이미지 사이즈
-
-                        # 회전 후 B-BOX의 면적 계산
-                        rotated_bbox_area = original_bbox_area  # 회전 후에도 크기 비율은 동일
-                        rotated_bbox_area_sum += rotated_bbox_area
-
-                        # 회전된 이미지 저장
-                        output_image_path = os.path.join(results_folder, f"rotated_horizontal_{image_name}")
-                        cv2.imwrite(output_image_path, rotated_image)
-                        print(f"Rotated horizontal image saved to: {output_image_path}")
-
-                        # 좌표를 문자열로 변환
-                        points_str = ', '.join([f'({points[j][0]}, {points[j][1]})' for j in range(len(points))])
-                        f.write(f'Class: {cls}, OBB Points: {points_str}, Rotation Angle: {rotation_angle:.2f} degrees\n')  # 모든 B-BOX 좌표 기록
-
-                # 회전 각도 및 크기 변화 기록
-                f.write(f"Applied Rotation Angle for {image_name}: {rotation_angle:.2f} degrees\n")
-                f.write(f"Original Image Size: {original_image_width}x{original_image_height}\n")
-                f.write(f"Rotated Image Size: {rotated_image_width}x{rotated_image_height}\n")
-                
-                # B-BOX 크기 변화 비율 계산 및 기록
-                bbox_size_change_ratio = rotated_bbox_area_sum / original_bbox_area_sum if original_bbox_area_sum != 0 else 0
-                f.write(f"B-BOX Size Change Ratio: {bbox_size_change_ratio:.2f}\n")
-
-            else:
-                f.write("No OBB detected.\n")  # 감지된 OBB가 없는 경우 기록
-
-            f.write("\n")  # 각 이미지 블록 사이에 줄 추가
-
-    print(f"Test results saved to: {results_folder}")
-    print(f"Bounding boxes saved to: {bbox_results_path}")
+            # IoU 계산 및 저장
+            for gt_box, pred_box in zip(ground_truths, predictions):
+                iou = calculate_iou(gt_box, pred_box.tolist())
+                f.write(f"IoU for {result.path}: {iou:.4f}\n")
+    
+    print(f"IoU results saved to: {iou_results_path}")
 
 # 테스트 실행
 test_model()
