@@ -1,23 +1,16 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 73, in <module>
-    model.load_state_dict(state_dict, strict=False)  # strict=False로 불일치 가중치 무시하고 로드
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2152, in load_state_dict
-    raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
-RuntimeError: Error(s) in loading state_dict for MobileNetV2:
-        size mismatch for features.1.conv.1.weight: copying a param with shape torch.Size([32]) from checkpoint, the shape in current model is torch.Size([16, 32, 1, 1]).
-        size mismatch for features.2.conv.3.weight: copying a param with shape torch.Size([96, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([24]).
-        size mismatch for features.3.conv.3.weight: copying a param with shape torch.Size([144, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([24]).
-        size mismatch for features.4.conv.3.weight: copying a param with shape torch.Size([144, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.5.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.6.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([32]).
-        size mismatch for features.7.conv.3.weight: copying a param with shape torch.Size([192, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.8.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.9.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.10.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([64]).
-        size mismatch for features.11.conv.3.weight: copying a param with shape torch.Size([384, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.12.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.13.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([96]).
-        size mismatch for features.14.conv.3.weight: copying a param with shape torch.Size([576, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.15.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.16.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([160]).
-        size mismatch for features.17.conv.3.weight: copying a param with shape torch.Size([960, 1, 3, 3]) from checkpoint, the shape in current model is torch.Size([320]).
+  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 68, in <module>
+    train_dataset = MNISTDataset(TRAIN_IMAGES_PATH, TRAIN_LABELS_PATH, transform=transform)
+  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 27, in __init__
+    self.images = self._load_images(images_path)
+  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 33, in _load_images
+    _ = int.from_bytes(f.read(4), byteorder='big')  # magic number
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 301, in read
+    return self._buffer.read(size)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/_compression.py", line 68, in readinto
+    data = self.read(len(byte_view))
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 488, in read
+    if not self._read_gzip_header():
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 436, in _read_gzip_header
+    raise BadGzipFile('Not a gzipped file (%r)' % magic)
+gzip.BadGzipFile: Not a gzipped file (b'\x00\x00')
