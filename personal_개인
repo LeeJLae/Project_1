@@ -1,2 +1,137 @@
-/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/_utils.py:831: UserWarning: TypedStorage is deprecated. It will be removed in the future and UntypedStorage will be the only storage class. This should only matter to you if you are using storages directly.  To access UntypedStorage directly, use tensor.untyped_storage() instead of tensor.storage()
-  return self.fget.__get__(instance, owner)()
+import cv2
+import re
+import os
+import torch
+import sys
+from PIL import Image, ImageDraw
+import numpy as np
+
+# 경로 설정
+MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
+CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/craft_mlt_25k.pth'
+YOLO_WEIGHT_PATH = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB1.pt'
+RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/latin_g2.pth'
+
+# EasyOCR 관련 모듈 로드
+sys.path.append(MODULE_PATH)
+from detection import get_textbox, get_detector  # Detection 모듈 불러오기
+from recognition import get_text, get_recognizer  # Recognition 모듈 불러오기
+
+# 장치 설정
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# CRAFT 모델 초기화 (텍스트 감지를 위해)
+detector = get_detector(CRAFT_WEIGHT_PATH, device=device)
+
+# OCR 모델 초기화
+character = '0123456789nm'  # OCR에 사용할 문자 집합
+recognizer, converter = get_recognizer(
+    recog_network='generation1',
+    network_params={'input_channel': 1, 'output_channel': 512, 'hidden_size': 256},
+    character=character,
+    separator_list=[],
+    dict_list=[],
+    model_path=RECOGNITION_WEIGHT_PATH,
+    device=device
+)
+
+def apply_mask(image):
+    """
+    하단 1/5만 남기고 상단을 마스킹 처리하는 함수
+    """
+    img_array = np.array(image)
+    height = img_array.shape[0]
+    mask_height = int(height * 0.6)  # 상단 4/5 부분을 검게 처리
+    img_array[:mask_height, :] = 0
+    return img_array
+
+def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, output_text_file, output_folder):
+    """
+    YOLO 데이터를 OBB 형식으로 처리하고, OCR로 나노미터 기준값 추출.
+    이미지에 B-BOX 표시하고 CLASS1의 텍스트 부분을 크롭하여 저장.
+    """
+    output = []
+
+    # 이미지 마스킹 적용
+    masked_image = apply_mask(image)
+    yolo_data = get_textbox(
+        detector, masked_image, canvas_size=1280, mag_ratio=1.5,
+        text_threshold=0.7, link_threshold=0.4, low_text=0.4,
+        poly=False, device=device
+    )
+
+    # 이미지 복사본을 생성해 경계 상자 그리기
+    output_image = image.copy()
+    image_height, image_width = image.shape[:2]
+
+    for polys in yolo_data:
+        for poly in polys:
+            class_id = 0  # 예시: Class 0으로 설정
+            coords = poly  # 좌표는 OBB 형식의 8개 좌표
+
+            # OCR 수행
+            min_x, max_x = min(coords[0::2]), max(coords[0::2])
+            min_y, max_y = min(coords[1::2]), max(coords[1::2])
+            cropped_image = masked_image[min_y:max_y, min_x:max_x]
+            ocr_result = get_text(
+                character=character, imgH=32, imgW=100,
+                recognizer=recognizer, converter=converter,
+                image_list=[((0, 0), cropped_image)], device=device
+            )
+
+            # OCR 결과에서 나노미터 값 추출
+            text, confidence = ocr_result[0][1], ocr_result[0][2]
+            nm_value = re.search(r'\d+ ?nm', text)
+            nm_value = nm_value.group() if nm_value else "N/A"
+
+            # 경계 상자를 상대 좌표로 변환
+            relative_coords = [coord / image_width if i % 2 == 0 else coord / image_height for i, coord in enumerate(coords)]
+
+            # 결과 형식에 맞게 추가 (CLASS 0만 추가)
+            if class_id == 0:
+                output.append(f"{image_name} {class_id} " + " ".join(map(str, relative_coords)))
+                output.append(f"OCR_TEXT: {text} - Confidence: {confidence}")
+                output.append(f"NM_VALUE: {nm_value}")
+
+                # 이미지에 경계 상자 표시
+                cv2.polylines(output_image, [np.array(coords, dtype=np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 255, 0), thickness=2)
+
+                # CLASS 1 텍스트 영역 크롭 및 저장
+                if text and class_id == 1:
+                    class1_crop_path = os.path.join(output_folder, f"{image_name}_class1_crop.jpg")
+                    cv2.imwrite(class1_crop_path, cropped_image)
+
+    # 저장할 경로 지정
+    output_image_path = os.path.join(output_folder, f"{image_name}_with_bboxes.jpg")
+    cv2.imwrite(output_image_path, output_image)  # 이미지 저장
+
+    # 텍스트 결과를 통합 파일에 저장
+    with open(output_text_file, 'a') as f:
+        for line in output:
+            f.write(line + '\n')
+
+def process_folder(input_folder, output_folder):
+    """
+    폴더 내의 모든 이미지에 대해 YOLO 데이터 처리 및 결과 저장.
+    """
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    output_text_file = os.path.join(output_folder, "combined_results.txt")
+    if os.path.exists(output_text_file):
+        os.remove(output_text_file)  # 기존 파일 삭제 후 새로 생성
+
+    for filename in os.listdir(input_folder):
+        if filename.endswith(('.jpg', '.png')):
+            image_path = os.path.join(input_folder, filename)
+            image = cv2.imread(image_path)
+
+            # YOLO 및 OCR 처리
+            process_yolo_and_ocr(image, filename.split('.')[0], detector, recognizer, converter, output_text_file, output_folder)
+
+# 입력 및 출력 폴더 경로
+input_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'
+output_folder = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
+
+# 폴더 내 이미지 처리 시작
+process_folder(input_folder, output_folder)
