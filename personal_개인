@@ -1,180 +1,19 @@
-
-import cv2
-import numpy as np
-import os
-import re
-import torch
-import sys
-
-# 경로 설정
-MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
-CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/craft_mlt_25k.pth'  # CRAFT 가중치 경로
-RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/latin_g2.pth'  # Recognition 가중치 경로
-YOLO_MASKED_IMG_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/maskedimg'  # YOLO 마스크된 이미지 폴더
-YOLO_TXT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/text'  # YOLO 결과 TXT 파일 폴더
-OUTPUT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/OCR/test'  # OCR 결과를 저장할 폴더
-
-sys.path.append(MODULE_PATH)
-from detection import get_textbox, get_detector  # Detection 모듈 불러오기
-from recognition import get_text, get_recognizer  # Recognition 모듈 불러오기
-
-# CRAFT 및 OCR 모델 초기화
-detector = get_detector(CRAFT_WEIGHT_PATH, device='cuda' if torch.cuda.is_available() else 'cpu')
-recognizer, converter = get_recognizer(
-    recog_network='generation1',
-    network_params={'input_channel': 1, 'output_channel': 512, 'hidden_size': 256},
-    character='0123456789',  # 숫자만 포함
-    separator_list=[],
-    dict_list=[],
-    model_path=RECOGNITION_WEIGHT_PATH,
-    device='cuda' if torch.cuda.is_available() else 'cpu'
-)
-
-def perform_ocr(masked_image, image_name, output_folder, yolo_boxes):
-    """OCR 수행 및 결과 저장"""
-    integer_value = None  # CLASS 1에서 얻은 정수값 초기화
-
-    for box in yolo_boxes:
-        # 바운딩 박스 정보에서 좌표 추출
-        box_info = box.split()
-        class_id = int(box_info[0])  # CLASS ID
-        coords = list(map(float, box_info[1:]))  # OBB 좌표 가져오기
-
-        # CLASS 1에서만 OCR 수행
-        if class_id == 1:
-            if len(coords) != 8:
-                print(f"Warning: Invalid coordinates for box: {box}")
-                continue
-
-            min_x, max_x = min(coords[0::2]), max(coords[0::2])
-            min_y, max_y = min(coords[1::2]), max(coords[1::2])
-
-            # 바운딩 박스 크롭
-            cropped_image = masked_image[int(min_y):int(max_y), int(min_x):int(max_x)]
-            if cropped_image.size == 0:
-                print(f"Warning: Cropped image is empty for box: {box}. Skipping OCR.")
-                continue
-
-            ocr_result = get_text(
-                character='0123456789', imgH=32, imgW=100,
-                recognizer=recognizer, converter=converter,
-                image_list=[((0, 0), cropped_image)], device='cuda' if torch.cuda.is_available() else 'cpu'
-            )
-
-            # OCR 결과에서 나노미터 값 추출
-            text, confidence = ocr_result[0][1], ocr_result[0][2]
-            nm_match = re.search(r'\b(1[0-4][0-9]|[1-9][0-9]?)\b', text)  # 2-3자리 정수, 3자리 정수는 150 이하
-            if nm_match:
-                integer_value = nm_match.group()  # 정수값 저장
-
-    # 개별 OCR 결과를 파일로 저장
-    output_text_file = os.path.join(output_folder, f"{image_name}.txt")
-    with open(output_text_file, 'w') as f:
-        for box in yolo_boxes:
-            box_info = box.split()
-            class_id = int(box_info[0])
-            coords = list(map(float, box_info[1:]))
-            f.write(f"{class_id} {' '.join(map(str, coords))}\n")  # CLASS ID와 좌표 정보 저장
-        if integer_value is not None:
-            f.write(f"INTEGER_VALUE {integer_value}\n")  # 정수값 저장
-
-def process_yolo_results():
-    """
-    YOLO 결과를 입력으로 하여 OCR 수행.
-    """
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
-
-    for filename in os.listdir(YOLO_MASKED_IMG_FOLDER):
-        if filename.endswith(('.jpg', '.png')):
-            # YOLO 결과 TXT 파일 이름 생성
-            yolo_boxes_file_name = f"{os.path.splitext(filename)[0]}.txt"
-            yolo_boxes_file = os.path.join(YOLO_TXT_FOLDER, yolo_boxes_file_name)
-
-            if not os.path.exists(yolo_boxes_file):
-                print(f"Warning: YOLO result file not found: {yolo_boxes_file}")
-                continue
-
-            # 마스크된 이미지 읽기
-            masked_image_path = os.path.join(YOLO_MASKED_IMG_FOLDER, filename)
-            masked_image = cv2.imread(masked_image_path)
-
-            with open(yolo_boxes_file, 'r') as f:
-                yolo_boxes = f.readlines()
-
-            # OCR 수행
-            perform_ocr(masked_image, os.path.splitext(filename)[0], OUTPUT_FOLDER, yolo_boxes)
-
-# YOLO 결과로부터 OCR 처리 시작
-process_yolo_results()
-
-    for box in yolo_boxes:
-        # 바운딩 박스 정보에서 좌표 추출
-        box_info = box.split()
-        class_id = int(box_info[0])  # CLASS ID
-        coords = list(map(float, box_info[1:]))  # OBB 좌표 가져오기
-
-        # CLASS 1에서만 OCR 수행
-        if class_id == 1:
-            if len(coords) != 8:
-                print(f"Warning: Invalid coordinates for box: {box}")
-                continue
-
-            min_x, max_x = min(coords[0::2]), max(coords[0::2])
-            min_y, max_y = min(coords[1::2]), max(coords[1::2])
-
-            # 바운딩 박스 크롭
-            cropped_image = masked_image[int(min_y):int(max_y), int(min_x):int(max_x)]
-            if cropped_image.size == 0:
-                print(f"Warning: Cropped image is empty for box: {box}. Skipping OCR.")
-                continue
-
-            # PIL 형식으로 변환하여 Tesseract OCR 수행
-            pil_image = Image.fromarray(cropped_image)
-            text = pytesseract.image_to_string(pil_image, config='--psm 7 digits')
-            
-            # OCR 결과에서 나노미터 값 추출
-            nm_match = re.search(r'\b(1[0-4][0-9]|[1-9][0-9]?)\b', text)  # 2-3자리 정수, 3자리 정수는 150 이하
-            if nm_match:
-                integer_value = nm_match.group()  # 정수값 저장
-
-    # 개별 OCR 결과를 파일로 저장
-    output_text_file = os.path.join(output_folder, f"{image_name}.txt")
-    with open(output_text_file, 'w') as f:
-        for box in yolo_boxes:
-            box_info = box.split()
-            class_id = int(box_info[0])
-            coords = list(map(float, box_info[1:]))
-            f.write(f"{class_id} {' '.join(map(str, coords))}\n")  # CLASS ID와 좌표 정보 저장
-        if integer_value is not None:
-            f.write(f"INTEGER_VALUE {integer_value}\n")  # 정수값 저장
-
-def process_yolo_results():
-    """
-    YOLO 결과를 입력으로 하여 Tesseract를 사용한 OCR 수행.
-    """
-    if not os.path.exists(OUTPUT_FOLDER):
-        os.makedirs(OUTPUT_FOLDER)
-
-    for filename in os.listdir(YOLO_MASKED_IMG_FOLDER):
-        if filename.endswith(('.jpg', '.png')):
-            # YOLO 결과 TXT 파일 이름 생성
-            yolo_boxes_file_name = f"{os.path.splitext(filename)[0]}.txt"
-            yolo_boxes_file = os.path.join(YOLO_TXT_FOLDER, yolo_boxes_file_name)
-
-            if not os.path.exists(yolo_boxes_file):
-                print(f"Warning: YOLO result file not found: {yolo_boxes_file}")
-                continue
-
-            # 마스크된 이미지 읽기
-            masked_image_path = os.path.join(YOLO_MASKED_IMG_FOLDER, filename)
-            masked_image = cv2.imread(masked_image_path)
-
-            with open(yolo_boxes_file, 'r') as f:
-                yolo_boxes = f.readlines()
-
-            # OCR 수행
-            perform_ocr(masked_image, os.path.splitext(filename)[0], OUTPUT_FOLDER, yolo_boxes)
-
-# YOLO 결과로부터 OCR 처리 시작
-process_yolo_results()
+/home/jovyan/SAM_Model/segment_anything/build_sam.py:105: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(f)
+Epoch 1/10
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 112, in <module>
+    train_sam()
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 45, in train_sam
+    segmented_image, measurements_dict = perform_segmentation_and_measurement(mask_generator, image, bboxes, measurements)
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 86, in perform_segmentation_and_measurement
+    masks = mask_generator.generate(image)  # 이미지에 대해 자동으로 마스크 생성
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 163, in generate
+    mask_data = self._generate_masks(image)
+  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 198, in _generate_masks
+    orig_size = image.shape[:2]
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 548, in __getattr__
+    raise AttributeError(name)
+AttributeError: shape. Did you mean: 'save'?
