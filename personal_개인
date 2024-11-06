@@ -1,20 +1,10 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 157, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 168, in <module>
     train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 93, in train_sam
-    for batch_idx, (images, bboxes, measurements, image_files) in enumerate(dataloader):
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
-    data = self._next_data()
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 757, in _next_data
-    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 55, in fetch
-    return self.collate_fn(data)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 398, in default_collate
-    return collate(batch, collate_fn_map=default_collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 211, in collate
-    return [
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 212, in <listcomp>
-    collate(samples, collate_fn_map=collate_fn_map)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/data/_utils/collate.py", line 207, in collate
-    raise RuntimeError("each element in list of batch should be of equal size")
-RuntimeError: each element in list of batch should be of equal size
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 105, in train_sam
+    true_mask = np.zeros_like(segmented_image)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/numpy/core/numeric.py", line 129, in zeros_like
+    res = empty_like(a, dtype=dtype, order=order, subok=subok, shape=shape)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/_tensor.py", line 1149, in __array__
+    return self.numpy()
+TypeError: can't convert cuda:0 device type tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.
