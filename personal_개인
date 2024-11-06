@@ -1,16 +1,32 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 68, in <module>
-    train_dataset = MNISTDataset(TRAIN_IMAGES_PATH, TRAIN_LABELS_PATH, transform=transform)
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 27, in __init__
-    self.images = self._load_images(images_path)
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 33, in _load_images
-    _ = int.from_bytes(f.read(4), byteorder='big')  # magic number
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 301, in read
-    return self._buffer.read(size)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/_compression.py", line 68, in readinto
-    data = self.read(len(byte_view))
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 488, in read
-    if not self._read_gzip_header():
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/gzip.py", line 436, in _read_gzip_header
-    raise BadGzipFile('Not a gzipped file (%r)' % magic)
-gzip.BadGzipFile: Not a gzipped file (b'\x00\x00')
+  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 103, in <module>
+    outputs = model(images)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torchvision/models/mobilenetv2.py", line 174, in forward
+    return self._forward_impl(x)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torchvision/models/mobilenetv2.py", line 166, in _forward_impl
+    x = self.features(x)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/container.py", line 215, in forward
+    input = module(input)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 460, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 456, in _conv_forward
+    return F.conv2d(input, weight, bias, self.stride,
+RuntimeError: Given groups=1, weight of size [32, 1, 3, 3], expected input[32, 3, 128, 128] to have 1 channels, but got 3 channels instead
