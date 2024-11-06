@@ -1,22 +1,8 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 155, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 156, in <module>
     train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 67, in train_sam
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 68, in train_sam
     segmented_image, measurements_dict = perform_segmentation_and_measurement(mask_generator, image_tensor, bboxes, measurements)
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 126, in perform_segmentation_and_measurement
-    masks = mask_generator.generate(image)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 163, in generate
-    mask_data = self._generate_masks(image)
-  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 206, in _generate_masks
-    crop_data = self._process_crop(image, crop_box, layer_idx, orig_size)
-  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 236, in _process_crop
-    self.predictor.set_image(cropped_im)
-  File "/home/jovyan/SAM_Model/segment_anything/predictor.py", line 56, in set_image
-    input_image = self.transform.apply_image(image)
-  File "/home/jovyan/SAM_Model/segment_anything/utils/transforms.py", line 31, in apply_image
-    return np.array(resize(to_pil_image(image), target_size))
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torchvision/transforms/functional.py", line 277, in to_pil_image
-    raise ValueError(f"pic should not have > 4 channels. Got {pic.shape[-1]} channels.")
-ValueError: pic should not have > 4 channels. Got 2676 channels.
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 138, in perform_segmentation_and_measurement
+    "measurements": measurements.get(str(class_id), 0)
+AttributeError: 'list' object has no attribute 'get'
