@@ -1,8 +1,12 @@
+/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py:147: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  return F.binary_cross_entropy(torch.sigmoid(torch.tensor(predicted_mask)), target_mask)
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 156, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 157, in <module>
     train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 68, in train_sam
-    segmented_image, measurements_dict = perform_segmentation_and_measurement(mask_generator, image_tensor, bboxes, measurements)
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 138, in perform_segmentation_and_measurement
-    "measurements": measurements.get(str(class_id), 0)
-AttributeError: 'list' object has no attribute 'get'
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 72, in train_sam
+    loss = compute_bce_loss(segmented_image, target_mask)
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 147, in compute_bce_loss
+    return F.binary_cross_entropy(torch.sigmoid(torch.tensor(predicted_mask)), target_mask)
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/functional.py", line 3545, in binary_cross_entropy
+    raise ValueError(
+ValueError: Using a target size (torch.Size([3, 2970])) that is different to the input size (torch.Size([3, 2970, 2970])) is deprecated. Please ensure they have the same size.
