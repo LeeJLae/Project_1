@@ -1,10 +1,8 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 166, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 168, in <module>
     train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 81, in train_sam
-    loss = compute_bce_loss(predicted_mask_flat, target_mask_flat)
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 156, in compute_bce_loss
-    return F.binary_cross_entropy(predicted_mask, target_mask)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/nn/functional.py", line 3545, in binary_cross_entropy
-    raise ValueError(
-ValueError: Using a target size (torch.Size([8898])) that is different to the input size (torch.Size([26391468])) is deprecated. Please ensure they have the same size.
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 75, in train_sam
+    loss = compute_iou_loss(segmented_image, target_mask)
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 153, in compute_iou_loss
+    intersection = (predicted_mask * target_mask).sum()
+RuntimeError: The size of tensor a (3) must match the size of tensor b (2524) at non-singleton dimension 2
