@@ -1,8 +1,8 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 168, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 174, in <module>
     train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 115, in train_sam
-    Image.fromarray(segmented_image.cpu().numpy()).save(save_path)  # CPU로 옮겨서 저장
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 121, in train_sam
+    Image.fromarray(segmented_image_np).save(save_path)  # 변환된 numpy 배열 저장
   File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 2930, in fromarray
     raise TypeError("Cannot handle this data type: %s, %s" % typekey) from e
 TypeError: Cannot handle this data type: (1, 1, 256), |u1
