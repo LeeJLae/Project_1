@@ -1,32 +1,110 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 103, in <module>
-    outputs = model(images)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torchvision/models/mobilenetv2.py", line 174, in forward
-    return self._forward_impl(x)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torchvision/models/mobilenetv2.py", line 166, in _forward_impl
-    x = self.features(x)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/container.py", line 215, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/container.py", line 215, in forward
-    input = module(input)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1518, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1527, in _call_impl
-    return forward_call(*args, **kwargs)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 460, in forward
-    return self._conv_forward(input, self.weight, self.bias)
-  File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/conv.py", line 456, in _conv_forward
-    return F.conv2d(input, weight, bias, self.stride,
-RuntimeError: Given groups=1, weight of size [32, 1, 3, 3], expected input[32, 3, 128, 128] to have 1 channels, but got 3 channels instead
+import cv2
+import numpy as np
+import os
+import re
+import sys
+import torch
+
+# 경로 설정
+MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
+CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/craft_mlt_25k.pth'  # CRAFT 가중치 경로
+RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/latin_g2.pth'  # Recognition 가중치 경로
+YOLO_OUTPUT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step'  # YOLO 결과를 저장한 폴더
+OUTPUT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/OCR/test'  # OCR 결과를 저장할 폴더
+
+sys.path.append(MODULE_PATH)
+from detection import get_textbox, get_detector  # Detection 모듈 불러오기
+from recognition import get_text, get_recognizer  # Recognition 모듈 불러오기
+
+# CRAFT 및 OCR 모델 초기화
+detector = get_detector(CRAFT_WEIGHT_PATH, device='cuda' if torch.cuda.is_available() else 'cpu')
+recognizer, converter = get_recognizer(
+    recog_network='generation1',
+    network_params={'input_channel': 1, 'output_channel': 512, 'hidden_size': 256},
+    character='0123456789',  # 숫자만 포함
+    separator_list=[],
+    dict_list=[],
+    model_path=RECOGNITION_WEIGHT_PATH,
+    device='cuda' if torch.cuda.is_available() else 'cpu'
+)
+
+def perform_ocr(image_with_bboxes, image_name, output_folder, yolo_boxes):
+    """OCR 수행 및 결과 저장"""
+    output = []
+    integer_value = None  # CLASS 1에서 얻은 정수값 초기화
+
+    for box in yolo_boxes:
+        # 바운딩 박스 정보에서 좌표 추출
+        box_info = box.split()
+        class_id = int(box_info[0])  # CLASS ID
+        coords = list(map(float, box_info[1:]))  # OBB 좌표 가져오기
+
+        # CLASS 1에서만 OCR 수행
+        if class_id == 1:
+            # OBB 좌표가 8개인지 확인
+            if len(coords) != 8:
+                print(f"Warning: Invalid coordinates for box: {box}")
+                continue
+
+            min_x, max_x = min(coords[0::2]), max(coords[0::2])
+            min_y, max_y = min(coords[1::2]), max(coords[1::2])
+
+            # 바운딩 박스 크롭
+            cropped_image = image_with_bboxes[int(min_y):int(max_y), int(min_x):int(max_x)]
+            if cropped_image.size == 0:
+                print(f"Warning: Cropped image is empty for box: {box}. Skipping OCR.")
+                continue  # 크롭된 이미지가 없으면 OCR 수행을 건너뜁니다.
+
+            ocr_result = get_text(
+                character='0123456789', imgH=32, imgW=100,
+                recognizer=recognizer, converter=converter,
+                image_list=[((0, 0), cropped_image)], device='cuda' if torch.cuda.is_available() else 'cpu'
+            )
+
+            # OCR 결과에서 나노미터 값 추출
+            text, confidence = ocr_result[0][1], ocr_result[0][2]
+            nm_match = re.search(r'\b(1[0-4][0-9]|[1-9][0-9]?)\b', text)  # 2-3자리 정수, 3자리 정수는 150 이하
+            if nm_match:
+                integer_value = nm_match.group()  # 정수값 저장
+
+    # 개별 OCR 결과를 파일로 저장
+    output_text_file = os.path.join(output_folder, f"{image_name}.txt")
+    with open(output_text_file, 'w') as f:
+        # OBB 정보 저장 (CLASS ID와 좌표만 저장)
+        for box in yolo_boxes:
+            box_info = box.split()
+            class_id = int(box_info[0])  # CLASS ID
+            coords = list(map(float, box_info[1:]))  # OBB 좌표 가져오기
+            f.write(f"{class_id} {' '.join(map(str, coords))}\n")  # CLASS ID와 좌표 정보 저장
+        f.write(f"INTEGER_VALUE {integer_value}\n")  # 정수값 저장
+
+def process_folder():
+    """
+    폴더 내의 모든 이미지에 대해 OCR 수행.
+    """
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
+
+    for filename in os.listdir(YOLO_OUTPUT_FOLDER):
+        if filename.endswith(('.jpg', '.png')):
+            # YOLO 결과 TXT 파일 이름 생성
+            yolo_boxes_file_name = f"{os.path.splitext(filename)[0]}.txt"
+            yolo_boxes_file = os.path.join(YOLO_OUTPUT_FOLDER, yolo_boxes_file_name)
+
+            # YOLO 결과 파일 읽기
+            if not os.path.exists(yolo_boxes_file):
+                print(f"Warning: YOLO result file not found: {yolo_boxes_file}")
+                continue  # 해당 파일이 없으면 다음 이미지로 넘어감
+
+            # 바운딩 박스가 그려진 이미지 읽기
+            original_image_path = os.path.join(YOLO_OUTPUT_FOLDER, filename)  # YOLO_OUTPUT_FOLDER에서 이미지 읽기
+            image_with_bboxes = cv2.imread(original_image_path)
+
+            with open(yolo_boxes_file, 'r') as f:
+                yolo_boxes = f.readlines()
+
+            # OCR 수행
+            perform_ocr(image_with_bboxes, os.path.splitext(filename)[0], OUTPUT_FOLDER, yolo_boxes)
+
+# 폴더 내 이미지 처리 시작
+process_folder()
