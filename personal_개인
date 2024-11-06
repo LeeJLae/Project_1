@@ -1,37 +1,29 @@
-class CTCLabelConverter(object):
-    """ Convert between text-label and text-index """
+from ultralytics import YOLO
+import os
+import torch
+import numpy
 
-    def __init__(self, character, separator_list = {}, dict_pathlist = {}):
-        # character (str): set of the possible characters.
-        dict_character = list(character)
+# YOLO 모델 로드 (기존 가중치 사용)
+model = YOLO('/home/jovyan/yolo11obb/yolo11m-obb.pt')  # 사전 학습된 가중치 파일 경로
 
-        self.dict = {}
-        for i, char in enumerate(dict_character):
-            self.dict[char] = i + 1
+# 증강된 데이터셋 경로를 정의한 .yaml 파일 경로
+train_data = '/home/jovyan/data-vol-1/Y_T_Data/YOLO_WB.yaml'  # 증강된 데이터셋의 yaml 파일 경로
 
-        self.character = ['[blank]'] + dict_character  # dummy '[blank]' token for CTCLoss (index 0)
+# 학습 결과를 저장할 디렉토리 생성
+output_dir = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB'
+os.makedirs(output_dir, exist_ok=True)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# YOLO 학습 실행
+model.train(
+    data=train_data,
+    imgsz=640,
+    epochs=50,               # 에포크 수 지정
+    batch=8,
+    lr0=0.001,               # 초기 학습률 설정왜 O
+    device=device,
+    amp=False,
+    val=False
+)
 
-        self.separator_list = separator_list
-        separator_char = []
-        for lang, sep in separator_list.items():
-            separator_char += sep
-        self.ignore_idx = [0] + [i+1 for i,item in enumerate(separator_char)]
-
-        ####### latin dict
-        if len(separator_list) == 0:
-            dict_list = []
-            for lang, dict_path in dict_pathlist.items():
-                try:
-                    with open(dict_path, "r", encoding = "utf-8-sig") as input_file:
-                        word_count =  input_file.read().splitlines()
-                    dict_list += word_count
-                except:
-                    pass
-        else:
-            dict_list = {}
-            for lang, dict_path in dict_pathlist.items():
-                with open(dict_path, "r", encoding = "utf-8-sig") as input_file:
-                    word_count =  input_file.read().splitlines()
-                dict_list[lang] = word_count
-
-        self.dict_list = dict_list
+# 학습된 모델 저장Eh
+model.save(os.path.join(output_dir, 'YOLO_WB1.pt'))
