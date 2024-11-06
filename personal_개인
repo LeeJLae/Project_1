@@ -35,12 +35,18 @@ recognizer, converter = get_recognizer(
     device=device
 )
 
-def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, output_text_file, output_folder):
+def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, output_folder):
     """
     YOLO 데이터를 OBB 형식으로 처리하고, OCR로 나노미터 기준값 추출.
     이미지에 B-BOX 표시하고 CLASS1의 텍스트 부분을 크롭하여 저장.
     """
     output = []
+
+    # 상단 절반 마스킹 처리
+    image_height, image_width = image.shape[:2]
+    mask = np.zeros_like(image)  # 이미지 크기와 동일한 검정 마스크 생성
+    mask[image_height // 2:, :] = image[image_height // 2:, :]  # 하단 절반을 원래 이미지로 유지
+    image = mask  # 마스킹된 이미지를 사용
 
     # YOLO 감지 결과 가져오기
     yolo_data = get_textbox(
@@ -51,7 +57,6 @@ def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, out
 
     # 이미지 복사본을 생성해 경계 상자 그리기
     output_image = image.copy()
-    image_height, image_width = image.shape[:2]
 
     for polys in yolo_data:
         for poly in polys:
@@ -94,8 +99,9 @@ def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, out
     output_image_path = os.path.join(output_folder, f"{image_name}_with_bboxes.jpg")
     cv2.imwrite(output_image_path, output_image)  # 이미지 저장
 
-    # 텍스트 결과를 통합 파일에 저장
-    with open(output_text_file, 'a') as f:
+    # 개별 텍스트 결과를 파일로 저장
+    output_text_file = os.path.join(output_folder, f"{image_name}.txt")  # 이미지 이름으로 텍스트 파일 생성
+    with open(output_text_file, 'w') as f:
         for line in output:
             f.write(line + '\n')
 
@@ -106,17 +112,13 @@ def process_folder(input_folder, output_folder):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    output_text_file = os.path.join(output_folder, "combined_results.txt")
-    if os.path.exists(output_text_file):
-        os.remove(output_text_file)  # 기존 파일 삭제 후 새로 생성
-
     for filename in os.listdir(input_folder):
         if filename.endswith(('.jpg', '.png')):
             image_path = os.path.join(input_folder, filename)
             image = cv2.imread(image_path)
 
-            # YOLO 및 OCR 처리
-            process_yolo_and_ocr(image, filename.split('.')[0], detector, recognizer, converter, output_text_file, output_folder)
+            # YOLO 및 OCR 처리 (output_text_file 인자를 제거)
+            process_yolo_and_ocr(image, filename.split('.')[0], detector, recognizer, converter, output_folder)
 
 # 입력 및 출력 폴더 경로
 input_folder = '/home/jovyan/data-vol-1/dataset_WB/test/images'
