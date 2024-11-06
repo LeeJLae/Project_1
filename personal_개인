@@ -1,18 +1,61 @@
-/home/jovyan/SAM_Model/segment_anything/build_sam.py:105: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
-  state_dict = torch.load(f)
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 61, in <module>
-    test_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 26, in test_sam
-    segmented_image, measurements_dict = perform_segmentation_and_measurement_test(mask_generator, image)
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 39, in perform_segmentation_and_measurement_test
+import os
+import torch
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
+from PIL import Image
+import json
+
+# 경로 설정
+TEST_IMAGE_DIR = "/home/jovyan/data-vol-1/dataset_WB/test/images"
+TEST_OUTPUT_DIR = "/home/jovyan/data-vol-1/Result/2_Measure/SAM/test"
+MODEL_LOAD_PATH = "/home/jovyan/data-vol-1/Result/2_Measure/SAM/BB_weight_SAM/SAM_FineTune.pth"  # 로드할 가중치 경로
+
+# SAM 모델 로드 (ViT-B)
+sam_model = sam_model_registry["vit_b"](checkpoint=MODEL_LOAD_PATH)
+mask_generator = SamAutomaticMaskGenerator(sam_model)
+
+# 테스트 함수 정의
+def test_sam():
+    for image_file in os.listdir(TEST_IMAGE_DIR):
+        if image_file.endswith(".jpg") or image_file.endswith(".png"):
+            image_path = os.path.join(TEST_IMAGE_DIR, image_file)
+            
+            # 이미지 로드
+            image = Image.open(image_path)
+            
+            # 세그멘테이션 수행 및 계측값 계산
+            segmented_image, measurements_dict = perform_segmentation_and_measurement_test(mask_generator, image)
+            
+            # 결과 저장
+            save_path = os.path.join(TEST_OUTPUT_DIR, f"segmented_{image_file}")
+            segmented_image.save(save_path)
+            
+            # 계측 값과 위치 좌표 저장 (JSON 형식)
+            json_path = os.path.join(TEST_OUTPUT_DIR, f"{image_file.replace('.jpg', '.json').replace('.png', '.json')}")
+            with open(json_path, 'w') as f:
+                json.dump(measurements_dict, f)
+
+def perform_segmentation_and_measurement_test(mask_generator, image):
+    # SAM 모델을 사용하여 세그멘테이션 수행
     masks = mask_generator.generate(image)
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
-    return func(*args, **kwargs)
-  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 163, in generate
-    mask_data = self._generate_masks(image)
-  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 198, in _generate_masks
-    orig_size = image.shape[:2]
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 548, in __getattr__
-    raise AttributeError(name)
-AttributeError: shape. Did you mean: 'save'?
+    segmented_image = apply_masks_to_image(image, masks)
+    measurements_dict = {}
+    
+    for i, mask in enumerate(masks):
+        class_id = i  # 각 마스크에 대한 임의의 클래스 ID (필요에 따라 수정 가능)
+        
+        # 마스크의 좌표 정보 및 크기 계산
+        bbox = mask["bbox"]
+        x, y, w, h = bbox
+        
+        measurements_dict[class_id] = {
+            "position": (x, y),
+            "width": w,
+            "height": h
+        }
+    return segmented_image, measurements_dict
+
+def apply_masks_to_image(image, masks):
+    return image  # 필요에 따라 마스크 오버레이 처리 추가
+
+# 테스트 시작
+test_sam()
