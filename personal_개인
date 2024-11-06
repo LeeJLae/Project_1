@@ -1,119 +1,18 @@
-import os
-import torch
-from torch.optim import Adam
-from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
-from PIL import Image, ImageEnhance
-import numpy as np
-import json
-import time
-import random
-
-# GPU 설정
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-# 경로 설정
-IMAGE_DIR = "/home/jovyan/data-vol-1/dataset_SAM/train/image"
-TXT_DIR = "/home/jovyan/data-vol-1/dataset_SAM/train/Class_txt"
-JSON_DIR = "/home/jovyan/data-vol-1/dataset_SAM/train/measure"
-OUTPUT_DIR = "/home/jovyan/data-vol-1/Result/2_Measure/SAM/test"
-MODEL_SAVE_PATH = "/home/jovyan/data-vol-1/Result/2_Measure/SAM/BB_weight_SAM/SAM_FineTune.pth"  # 가중치 저장 경로
-
-
-# SAM 모델 로드 (ViT-B)
-sam_checkpoint_path = "/home/jovyan/SAM/sam_vit_b_01ec64.pth"
-sam_model = sam_model_registry["vit_b"](checkpoint=sam_checkpoint_path)
-
-# 학습 하이퍼파라미터
-num_epochs = 10
-learning_rate = 1e-4
-optimizer = Adam(sam_model.parameters(), lr=learning_rate)
-
-def train_sam():
-    mask_generator = SamAutomaticMaskGenerator(sam_model)
-
-    for epoch in range(num_epochs):
-        print(f"Epoch {epoch + 1}/{num_epochs}")
-        
-        for image_file in os.listdir(IMAGE_DIR):
-            if image_file.endswith(".jpg") or image_file.endswith(".png"):
-                image_path = os.path.join(IMAGE_DIR, image_file)
-                txt_path = os.path.join(TXT_DIR, image_file.replace(".jpg", ".txt").replace(".png", ".txt"))
-                json_path = os.path.join(JSON_DIR, image_file.replace(".jpg", ".json").replace(".png", ".json"))
-                
-                image = Image.open(image_path).convert("RGB")
-                bboxes = load_bboxes(txt_path)
-                measurements = parse_json(json_path)
-
-                image_np = np.array(image)
-
-                segmented_image, measurements_dict = perform_segmentation_and_measurement(mask_generator, image_np, bboxes, measurements)
-
-                # 손실 계산
-                loss = compute_iou_loss(segmented_image, measurements_dict)
-
-                # 손실 값 출력
-                print(f"Loss for {image_file}: {loss.item()}")
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                save_path = os.path.join(OUTPUT_DIR, f"segmented_{image_file}")
-                Image.fromarray(segmented_image).save(save_path)
-
-                output_json_path = os.path.join(OUTPUT_DIR, f"{image_file.replace('.jpg', '.json').replace('.png', '.json')}")
-                with open(output_json_path, 'w') as f:
-                    json.dump(measurements_dict, f)
-
-        print(f"Epoch {epoch + 1} 완료")
-
-    torch.save(sam_model.state_dict(), MODEL_SAVE_PATH)
-    print(f"모델 가중치가 {MODEL_SAVE_PATH}에 저장되었습니다.")
-
-def load_bboxes(txt_path):
-    bboxes = []
-    with open(txt_path, 'r') as f:
-        for line in f:
-            class_id, x, y, w, h = map(float, line.strip().split())
-            bboxes.append({"class_id": int(class_id), "x": x, "y": y, "w": w, "h": h})
-    return bboxes
-
-def parse_json(json_path):
-    with open(json_path, 'r') as f:
-        measurements = json.load(f)
-    return measurements
-
-def perform_segmentation_and_measurement(mask_generator, image, bboxes, measurements):
+/home/jovyan/SAM_Model/segment_anything/build_sam.py:105: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(f)
+Traceback (most recent call last):
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 61, in <module>
+    test_sam()
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 26, in test_sam
+    segmented_image, measurements_dict = perform_segmentation_and_measurement_test(mask_generator, image)
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 39, in perform_segmentation_and_measurement_test
     masks = mask_generator.generate(image)
-    segmented_image = apply_masks_to_image(image, masks)
-    
-    measurements_dict = {}
-    for bbox in bboxes:
-        class_id = bbox["class_id"]
-        x, y, w, h = bbox["x"], bbox["y"], bbox["w"], bbox["h"]
-        measurements_dict[class_id] = {
-            "position": (x, y),
-            "width": w,
-            "height": h,
-            "measurements": measurements.get(str(class_id), 0)
-        }
-    return segmented_image, measurements_dict
-
-def apply_masks_to_image(image, masks):
-    return image  # 현재는 입력 이미지를 그대로 반환
-
-def compute_iou_loss(segmented_image, measurements_dict):
-    # IoU 손실 계산을 위한 함수 (예시)
-    # 여기서는 간단한 예시로 손실을 0으로 초기화하고 있습니다.
-    # IoU를 기반으로 손실을 계산하는 로직을 추가해야 합니다.
-    
-    # 실제 손실 계산 로직을 구현하세요.
-    loss = torch.tensor(0.0)  # 기본적으로 0으로 설정 (구현 필요)
-    
-    # 예시: segmented_image와 measurements_dict를 기반으로 실제 IoU 계산
-    # IoU 계산 로직이 필요합니다.
-
-    return loss
-
-# 학습 시작
-train_sam()
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 116, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 163, in generate
+    mask_data = self._generate_masks(image)
+  File "/home/jovyan/SAM_Model/segment_anything/automatic_mask_generator.py", line 198, in _generate_masks
+    orig_size = image.shape[:2]
+  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 548, in __getattr__
+    raise AttributeError(name)
+AttributeError: shape. Did you mean: 'save'?
