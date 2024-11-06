@@ -1,8 +1,8 @@
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 168, in <module>
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 170, in <module>
     train_sam()
   File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 75, in train_sam
     loss = compute_iou_loss(segmented_image, target_mask)
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 153, in compute_iou_loss
+  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 155, in compute_iou_loss
     intersection = (predicted_mask * target_mask).sum()
-RuntimeError: The size of tensor a (3) must match the size of tensor b (2524) at non-singleton dimension 2
+RuntimeError: The size of tensor a (3) must match the size of tensor b (2814) at non-singleton dimension 2
