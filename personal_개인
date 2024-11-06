@@ -8,9 +8,9 @@ import numpy as np
 
 # 경로 설정
 MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
-CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/craft_mlt_25k.pth'
-YOLO_WEIGHT_PATH = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB1.pt'
-RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/latin_g2.pth'
+CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/craft_mlt_25k.pth'  # CRAFT 가중치 경로
+YOLO_WEIGHT_PATH = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/YOLO_WB1.pt'  # YOLO 가중치 경로
+RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/OCR/latin_g2.pth'  # Recognition 가중치 경로
 
 # EasyOCR 관련 모듈 로드
 sys.path.append(MODULE_PATH)
@@ -35,16 +35,6 @@ recognizer, converter = get_recognizer(
     device=device
 )
 
-def apply_mask(image):
-    """
-    하단 1/5만 남기고 상단을 마스킹 처리하는 함수
-    """
-    img_array = np.array(image)
-    height = img_array.shape[0]
-    mask_height = int(height * 0.6)  # 상단 4/5 부분을 검게 처리
-    img_array[:mask_height, :] = 0
-    return img_array
-
 def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, output_text_file, output_folder):
     """
     YOLO 데이터를 OBB 형식으로 처리하고, OCR로 나노미터 기준값 추출.
@@ -52,10 +42,9 @@ def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, out
     """
     output = []
 
-    # 이미지 마스킹 적용
-    masked_image = apply_mask(image)
+    # YOLO 감지 결과 가져오기
     yolo_data = get_textbox(
-        detector, masked_image, canvas_size=1280, mag_ratio=1.5,
+        detector, image, canvas_size=1280, mag_ratio=1.5,
         text_threshold=0.7, link_threshold=0.4, low_text=0.4,
         poly=False, device=device
     )
@@ -72,7 +61,7 @@ def process_yolo_and_ocr(image, image_name, detector, recognizer, converter, out
             # OCR 수행
             min_x, max_x = min(coords[0::2]), max(coords[0::2])
             min_y, max_y = min(coords[1::2]), max(coords[1::2])
-            cropped_image = masked_image[min_y:max_y, min_x:max_x]
+            cropped_image = image[min_y:max_y, min_x:max_x]
             ocr_result = get_text(
                 character=character, imgH=32, imgW=100,
                 recognizer=recognizer, converter=converter,
