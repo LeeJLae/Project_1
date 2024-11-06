@@ -1,8 +1,94 @@
-Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 174, in <module>
-    train_sam()
-  File "/home/jovyan/jonglae/Retry1/DO/1_1_SAM_base_train.py", line 121, in train_sam
-    Image.fromarray(segmented_image_np).save(save_path)  # 변환된 numpy 배열 저장
-  File "/home/jovyan/.conda/envs/aipbase/lib/python3.10/site-packages/PIL/Image.py", line 2930, in fromarray
-    raise TypeError("Cannot handle this data type: %s, %s" % typekey) from e
-TypeError: Cannot handle this data type: (1, 1, 256), |u1
+import cv2
+import numpy as np
+import os
+import re
+from PIL import Image
+import pytesseract
+
+# 경로 설정
+YOLO_MASKED_IMG_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/maskedimg'  # YOLO 마스크된 이미지 폴더
+YOLO_TXT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/text'  # YOLO 결과 TXT 파일 폴더
+OUTPUT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/OCR/test'  # OCR 결과를 저장할 폴더
+
+# Tesseract 설정
+pytesseract.pytesseract.tesseract_cmd = '/home/jovyan/TERA/tesseract-ocr.exe'  # Tesseract 실행 파일 경로 지정
+
+def preprocess_image(cropped_image):
+    """이미지 대비 및 이진화로 OCR 성능 향상"""
+    gray_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+    # 대비 향상
+    enhanced_image = cv2.equalizeHist(gray_image)
+    # 이진화 적용
+    _, binary_image = cv2.threshold(enhanced_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return Image.fromarray(binary_image)
+
+def perform_ocr(masked_image, image_name, output_folder, yolo_boxes):
+    """Tesseract를 사용한 OCR 수행 및 숫자 결과 저장"""
+    integer_value = None  # CLASS 1에서 얻은 정수값 초기화
+
+    for box in yolo_boxes:
+        # 바운딩 박스 정보에서 좌표 추출
+        box_info = box.split()
+        class_id = int(box_info[0])  # CLASS ID
+        coords = list(map(float, box_info[1:]))  # OBB 좌표 가져오기
+
+        # CLASS 1에서만 OCR 수행
+        if class_id == 1:
+            if len(coords) != 8:
+                print(f"Warning: Invalid coordinates for box: {box}")
+                continue
+
+            min_x, max_x = min(coords[0::2]), max(coords[0::2])
+            min_y, max_y = min(coords[1::2]), max(coords[1::2])
+
+            # 바운딩 박스 크롭
+            cropped_image = masked_image[int(min_y):int(max_y), int(min_x):int(max_x)]
+            if cropped_image.size == 0:
+                print(f"Warning: Cropped image is empty for box: {box}. Skipping OCR.")
+                continue
+
+            # 전처리 및 OCR 수행
+            processed_image = preprocess_image(cropped_image)
+            text = pytesseract.image_to_string(processed_image, config='--psm 7 digits')
+            
+            # OCR 결과에서 숫자만 추출
+            nm_match = re.search(r'\b(1[0-4][0-9]|[1-9][0-9]?)\b', text)  # 2-3자리 정수, 3자리 정수는 150 이하
+            if nm_match:
+                integer_value = nm_match.group()  # 정수값 저장
+                break  # 정수값을 찾으면 반복 종료
+
+    # OCR 결과를 파일로 저장 (정수 값만)
+    output_text_file = os.path.join(output_folder, f"{image_name}.txt")
+    with open(output_text_file, 'w') as f:
+        if integer_value is not None:
+            f.write(f"{integer_value}\n")  # 정수값 저장
+
+def process_yolo_results():
+    """
+    YOLO 결과를 입력으로 하여 Tesseract를 사용한 OCR 수행.
+    """
+    if not os.path.exists(OUTPUT_FOLDER):
+        os.makedirs(OUTPUT_FOLDER)
+
+    for filename in os.listdir(YOLO_MASKED_IMG_FOLDER):
+        if filename.endswith(('.jpg', '.png')):
+            # YOLO 결과 TXT 파일 이름 생성
+            yolo_boxes_file_name = f"{os.path.splitext(filename)[0]}.txt"
+            yolo_boxes_file = os.path.join(YOLO_TXT_FOLDER, yolo_boxes_file_name)
+
+            if not os.path.exists(yolo_boxes_file):
+                print(f"Warning: YOLO result file not found: {yolo_boxes_file}")
+                continue
+
+            # 마스크된 이미지 읽기
+            masked_image_path = os.path.join(YOLO_MASKED_IMG_FOLDER, filename)
+            masked_image = cv2.imread(masked_image_path)
+
+            with open(yolo_boxes_file, 'r') as f:
+                yolo_boxes = f.readlines()
+
+            # OCR 수행
+            perform_ocr(masked_image, os.path.splitext(filename)[0], OUTPUT_FOLDER, yolo_boxes)
+
+# YOLO 결과로부터 OCR 처리 시작
+process_yolo_results()
