@@ -3,8 +3,8 @@
 /home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=None`.
   warnings.warn(msg)
 Traceback (most recent call last):
-  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 22, in <module>
-    model.load_state_dict(torch.load(PRETRAINED_MODEL_PATH), strict=False)  # strict=False로 불일치 가중치 무시
+  File "/home/jovyan/jonglae/Retry1/DO/3_MobileNet_OCR_Train.py", line 26, in <module>
+    missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
   File "/home/jovyan/.conda/envs/aipbase2/lib/python3.10/site-packages/torch/nn/modules/module.py", line 2152, in load_state_dict
     raise RuntimeError('Error(s) in loading state_dict for {}:\n\t{}'.format(
 RuntimeError: Error(s) in loading state_dict for MobileNetV2:
