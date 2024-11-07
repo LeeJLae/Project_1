@@ -1,77 +1,83 @@
 import cv2
 import os
-import sys
 import numpy as np
 from ultralytics import YOLO  # Ultralytics YOLO 가져오기
 
 # 경로 설정
 YOLO_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/new_2step_test/best.pt'  # YOLO 가중치 경로
-INPUT_FOLDER = '/home/jovyan/data-vol-1/0_Retry_Final/STEP1/0_fortestest'  # 입력 이미지 폴더
-OUTPUT_FOLDER = '/home/jovyan/data-vol-1/0_Retry_Final/STEP1/Mode_1'  # 출력 결과 폴더
+INPUT_FOLDER = '/home/jovyan/data-vol-1/dataset_WB/test/images'  # 입력 이미지 폴더
+OUTPUT_BBOX_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/bbox_img'  # b-box 이미지 출력 폴더
+OUTPUT_TXT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/text'  # txt 파일 출력 폴더
+OUTPUT_MASKED_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/maskedimg'  # 마스킹된 이미지 출력 폴더
 
 # YOLO 모델 로드
 model = YOLO(YOLO_WEIGHT_PATH)
 
-def mask_image(image):
-    """상단 절반 마스킹 처리"""
+def mask_image(image, boxes, classes):
+    """CLASS 1을 제외한 나머지 영역을 가리는 마스크 생성"""
     image_height, image_width = image.shape[:2]
-    mask = np.zeros_like(image)  # 이미지 크기와 동일한 검정 마스크 생성
-    mask[image_height // 2:, :] = image[image_height // 2:, :]  # 하단 절반을 원래 이미지로 유지
+    mask = np.zeros_like(image)  # 전체 검정 마스크 생성
+
+    for i in range(len(boxes)):
+        if classes[i] == 1:  # CLASS 1인 경우만 남김
+            coords = boxes[i].tolist()
+            x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
+            mask[y1:y2, x1:x2] = image[y1:y2, x1:x2]  # 해당 영역을 원래 이미지로 유지
+
     return mask  # 마스킹된 이미지 반환
 
-def detect_yolo(image, image_name, output_folder):
+def detect_yolo(image, image_name):
     """YOLO를 사용하여 바운딩 박스 감지 및 결과 저장"""
     output = []
 
-    # 이미지 마스킹
-    masked_image = mask_image(image)
-
     # YOLO 감지 결과 가져오기
-    results = model.predict(masked_image)  # model.predict 사용
+    results = model.predict(image)  # model.predict 사용
 
     # 결과에서 OBB 정보 추출
-    image_height, image_width = masked_image.shape[:2]  # 이미지 크기 얻기
+    image_height, image_width = image.shape[:2]
     for result in results:
         boxes = result.obb.xyxy  # OBB 좌표
         classes = result.obb.cls  # 클래스 ID
+        masked_image = mask_image(image, boxes, classes)  # 마스킹 이미지 생성
+
         for i in range(len(boxes)):
-            coords = boxes[i].tolist()  # 바운딩 박스 좌표
-            class_id = int(classes[i])  # 클래스 ID
-            # 8개 좌표 형식으로 변환 (상대 좌표)
+            coords = boxes[i].tolist()
+            class_id = int(classes[i])
             obb_coords = [
-                coords[0] / image_width, coords[1] / image_height,  # 좌상단
-                coords[2] / image_width, coords[1] / image_height,  # 우상단
-                coords[2] / image_width, coords[3] / image_height,  # 우하단
-                coords[0] / image_width, coords[3] / image_height   # 좌하단
+                coords[0] / image_width, coords[1] / image_height,
+                coords[2] / image_width, coords[1] / image_height,
+                coords[2] / image_width, coords[3] / image_height,
+                coords[0] / image_width, coords[3] / image_height
             ]
-            output.append(f"{class_id} " + " ".join(map(str, obb_coords)))  # 클래스와 상대 좌표 저장
+            output.append(f"{class_id} " + " ".join(map(str, obb_coords)))
 
-            # 바운딩 박스를 이미지에 그리기
-            obb_coords_abs = np.array(obb_coords).reshape(-1, 2) * np.array([image_width, image_height])  # 상대 좌표를 절대 좌표로 변환
-            obb_coords_abs = obb_coords_abs.astype(np.int32).reshape((-1, 1, 2))  # 정수형으로 변환
-            cv2.polylines(masked_image, [obb_coords_abs], isClosed=True, color=(0, 255, 0), thickness=2)
+            obb_coords_abs = np.array(obb_coords).reshape(-1, 2) * np.array([image_width, image_height])
+            obb_coords_abs = obb_coords_abs.astype(np.int32).reshape((-1, 1, 2))
+            cv2.polylines(image, [obb_coords_abs], isClosed=True, color=(0, 255, 0), thickness=2)
 
-    # 결과 이미지와 TXT 파일 이름 통일
-    result_file_base = os.path.join(output_folder, image_name)  # 기본 파일 이름
-    cv2.imwrite(f"{result_file_base}.jpg", masked_image)  # 이미지 저장
-    with open(f"{result_file_base}.txt", 'w') as f:  # 텍스트 파일 저장
-        for entry in output:  # 제목 제외하고 OBB 데이터만 저장
+    if not os.path.exists(OUTPUT_BBOX_FOLDER):
+        os.makedirs(OUTPUT_BBOX_FOLDER)
+    if not os.path.exists(OUTPUT_TXT_FOLDER):
+        os.makedirs(OUTPUT_TXT_FOLDER)
+    if not os.path.exists(OUTPUT_MASKED_FOLDER):
+        os.makedirs(OUTPUT_MASKED_FOLDER)
+
+    # 결과 이미지와 TXT 파일 저장
+    cv2.imwrite(os.path.join(OUTPUT_BBOX_FOLDER, f"{image_name}.jpg"), image)
+    with open(os.path.join(OUTPUT_TXT_FOLDER, f"{image_name}.txt"), 'w') as f:
+        for entry in output:
             f.write(entry + '\n')
 
-def process_folder(input_folder, output_folder):
-    """
-    폴더 내의 모든 이미지에 대해 YOLO 데이터 처리 및 결과 저장.
-    """
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    # 마스킹된 이미지 저장
+    cv2.imwrite(os.path.join(OUTPUT_MASKED_FOLDER, f"{image_name}.jpg"), masked_image)
 
+def process_folder(input_folder):
+    """폴더 내의 모든 이미지에 대해 YOLO 데이터 처리 및 결과 저장"""
     for filename in os.listdir(input_folder):
         if filename.endswith(('.jpg', '.png')):
             image_path = os.path.join(input_folder, filename)
             image = cv2.imread(image_path)
-
-            # Step 1: YOLO 활용
-            detect_yolo(image, filename.split('.')[0], output_folder)
+            detect_yolo(image, filename.split('.')[0])
 
 # 폴더 내 이미지 처리 시작
-process_folder(INPUT_FOLDER, OUTPUT_FOLDER)
+process_folder(INPUT_FOLDER)
