@@ -1,83 +1,74 @@
 import cv2
 import os
+import pytesseract
 import numpy as np
-from ultralytics import YOLO  # Ultralytics YOLO 가져오기
+import re
 
-# 경로 설정
-YOLO_WEIGHT_PATH = '/home/jovyan/jonglae/Retry1/Main/MODE_0_OCR_WB_YOLO/new_2step_test/best.pt'  # YOLO 가중치 경로
-INPUT_FOLDER = '/home/jovyan/data-vol-1/dataset_WB/test/images'  # 입력 이미지 폴더
-OUTPUT_BBOX_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/bbox_img'  # b-box 이미지 출력 폴더
-OUTPUT_TXT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/text'  # txt 파일 출력 폴더
-OUTPUT_MASKED_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/1step/maskedimg'  # 마스킹된 이미지 출력 폴더
+# Tesseract 경로 설정 (필요 시 수정)
+pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
 
-# YOLO 모델 로드
-model = YOLO(YOLO_WEIGHT_PATH)
+# 폴더 경로 설정
+NUMBER_IMAGE_FOLDER = '/home/jovyan/data-vol-1/0_Retry_Final/STEP1/Mode_1/masked_image_folder'
+OUTPUT_FOLDER = '/home/jovyan/data-vol-1/0_Retry_Final/STEP1/Mode_2'
 
-def mask_image(image, boxes, classes):
-    """CLASS 1을 제외한 나머지 영역을 가리는 마스크 생성"""
-    image_height, image_width = image.shape[:2]
-    mask = np.zeros_like(image)  # 전체 검정 마스크 생성
+# 출력 폴더 생성
+if not os.path.exists(OUTPUT_FOLDER):
+    os.makedirs(OUTPUT_FOLDER)
 
-    for i in range(len(boxes)):
-        if classes[i] == 1:  # CLASS 1인 경우만 남김
-            coords = boxes[i].tolist()
-            x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
-            mask[y1:y2, x1:x2] = image[y1:y2, x1:x2]  # 해당 영역을 원래 이미지로 유지
+def apply_brightness_threshold(image, brightness_threshold=0.8):
+    """이미지에서 밝기 임계값을 적용하여 하얀 픽셀만 남기기"""
+    # 그레이스케일 변환
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # 밝기 임계값을 적용하여 특정 밝기 이상의 픽셀만 남김
+    threshold_value = int(255 * brightness_threshold)
+    _, bright_areas = cv2.threshold(gray_image, threshold_value, 255, cv2.THRESH_BINARY)
 
-    return mask  # 마스킹된 이미지 반환
+    return bright_areas
 
-def detect_yolo(image, image_name):
-    """YOLO를 사용하여 바운딩 박스 감지 및 결과 저장"""
-    output = []
+def make_non_white_pixels_black(image):
+    """픽셀 값이 1이 아닌 픽셀을 모두 검은색(0)으로 변경"""
+    # 이진화 이미지에서 1이 아닌 모든 픽셀을 0으로 설정
+    image[image != 255] = 0  # 흰색이 아닌 부분을 모두 검정색으로 설정
+    return image
 
-    # YOLO 감지 결과 가져오기
-    results = model.predict(image)  # model.predict 사용
+def perform_ocr_on_image(image_path, output_name):
+    """주어진 이미지에 대해 OCR을 수행하고 보이는 모든 숫자를 저장"""
+    # 이미지 로드
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"Error: 이미지를 불러올 수 없습니다: {image_path}")
+        return
 
-    # 결과에서 OBB 정보 추출
-    image_height, image_width = image.shape[:2]
-    for result in results:
-        boxes = result.obb.xyxy  # OBB 좌표
-        classes = result.obb.cls  # 클래스 ID
-        masked_image = mask_image(image, boxes, classes)  # 마스킹 이미지 생성
+    # 밝기 임계값 적용하여 하얀 부분만 남김
+    bright_image = apply_brightness_threshold(image)
 
-        for i in range(len(boxes)):
-            coords = boxes[i].tolist()
-            class_id = int(classes[i])
-            obb_coords = [
-                coords[0] / image_width, coords[1] / image_height,
-                coords[2] / image_width, coords[1] / image_height,
-                coords[2] / image_width, coords[3] / image_height,
-                coords[0] / image_width, coords[3] / image_height
-            ]
-            output.append(f"{class_id} " + " ".join(map(str, obb_coords)))
+    # 픽셀 값이 1이 아닌 부분을 모두 검은색으로 변경
+    processed_image = make_non_white_pixels_black(bright_image)
 
-            obb_coords_abs = np.array(obb_coords).reshape(-1, 2) * np.array([image_width, image_height])
-            obb_coords_abs = obb_coords_abs.astype(np.int32).reshape((-1, 1, 2))
-            cv2.polylines(image, [obb_coords_abs], isClosed=True, color=(0, 255, 0), thickness=2)
+    # OCR 수행하여 하얀 부분에서 모든 숫자 인식
+    text = pytesseract.image_to_string(processed_image, config='--psm 6')
 
-    if not os.path.exists(OUTPUT_BBOX_FOLDER):
-        os.makedirs(OUTPUT_BBOX_FOLDER)
-    if not os.path.exists(OUTPUT_TXT_FOLDER):
-        os.makedirs(OUTPUT_TXT_FOLDER)
-    if not os.path.exists(OUTPUT_MASKED_FOLDER):
-        os.makedirs(OUTPUT_MASKED_FOLDER)
+    # 결과에서 모든 숫자 및 공백(띄어쓰기 포함)을 추출
+    numbers = re.findall(r'\d+', text)  # 모든 숫자 패턴을 찾음
 
-    # 결과 이미지와 TXT 파일 저장
-    cv2.imwrite(os.path.join(OUTPUT_BBOX_FOLDER, f"{image_name}.jpg"), image)
-    with open(os.path.join(OUTPUT_TXT_FOLDER, f"{image_name}.txt"), 'w') as f:
-        for entry in output:
-            f.write(entry + '\n')
+    # OCR 결과를 파일로 저장
+    output_text_file = os.path.join(OUTPUT_FOLDER, f"{output_name}_ocr_result.txt")
+    with open(output_text_file, 'w') as f:
+        if numbers:
+            f.write(" ".join(numbers) + "\n")  # 모든 숫자를 공백으로 구분하여 저장
+        else:
+            f.write("No numbers found\n")
 
-    # 마스킹된 이미지 저장
-    cv2.imwrite(os.path.join(OUTPUT_MASKED_FOLDER, f"{image_name}.jpg"), masked_image)
-
-def process_folder(input_folder):
-    """폴더 내의 모든 이미지에 대해 YOLO 데이터 처리 및 결과 저장"""
-    for filename in os.listdir(input_folder):
+def process_images_in_folder():
+    """폴더 내 모든 이미지에 대해 OCR 수행"""
+    for filename in os.listdir(NUMBER_IMAGE_FOLDER):
         if filename.endswith(('.jpg', '.png')):
-            image_path = os.path.join(input_folder, filename)
-            image = cv2.imread(image_path)
-            detect_yolo(image, filename.split('.')[0])
+            # 이미지 파일 경로
+            image_path = os.path.join(NUMBER_IMAGE_FOLDER, filename)
+            # OCR 수행
+            perform_ocr_on_image(image_path, os.path.splitext(filename)[0])
+            print(f"OCR 작업이 완료되었습니다: {filename}")
 
-# 폴더 내 이미지 처리 시작
-process_folder(INPUT_FOLDER)
+# 폴더 내 모든 이미지에 대해 OCR 수행
+process_images_in_folder()
