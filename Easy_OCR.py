@@ -1,59 +1,115 @@
-import cv2
-import os
 import torch
-import sys
+from torch import nn, optim
+from torchvision import transforms
+from omegaconf import DictConfig, OmegaConf
+from hydra import initialize, compose
+from hydra.core.global_hydra import GlobalHydra
+import os
+from PIL import Image
+from tqdm import tqdm
+from sam2.build_sam import build_sam2
 
-# 경로 설정
-MODULE_PATH = '/home/jovyan/STN/EasyOCR/easyocr'
-CRAFT_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/craft_mlt_25k.pth'  # CRAFT 가중치 경로
-RECOGNITION_WEIGHT_PATH = '/home/jovyan/jonglae2/OCR/OCR/latin_g2.pth'  # Recognition 가중치 경로
-INPUT_IMAGE_FOLDER = '/home/jovyan/data-vol-1/ResultForOCR/mask/maskedimg'  # 입력 이미지 폴더
-OUTPUT_FOLDER = '/home/jovyan/data-vol-1/Result/2_Measure/YOLO/WB/OCR/test_horizontal_Easyocr'  # OCR 결과 저장 폴더
+# Hydra 초기화 상태 확인 및 정리
+if GlobalHydra.instance().is_initialized():
+    GlobalHydra.instance().clear()
 
-sys.path.append(MODULE_PATH)
-from detection import get_textbox, get_detector  # Detection 모듈 불러오기
-from recognition import get_text, get_recognizer  # Recognition 모듈 불러오기
+# Hydra 초기화 및 구성 불러오기
+try:
+    with initialize(config_path="./sam2/configs", job_name="sam2_config"):
+        cfg = compose(config_name="sam2.1_training/sam2.1_finetune.yaml")
+    print("Configuration loaded successfully with Hydra!")
+except Exception as e:
+    print(f"Error loading configuration with Hydra: {e}")
+    exit(1)
 
-# CRAFT 및 OCR 모델 초기화
-detector = get_detector(CRAFT_WEIGHT_PATH, device='cuda' if torch.cuda.is_available() else 'cpu')
-recognizer, converter = get_recognizer(
-    recog_network='generation1',
-    network_params={'input_channel': 1, 'output_channel': 512, 'hidden_size': 256},
-    character='0123456789',  # 숫자만 포함
-    separator_list=[],
-    dict_list=[],
-    model_path=RECOGNITION_WEIGHT_PATH,
-    device='cuda' if torch.cuda.is_available() else 'cpu'
-)
+# 디버깅: 전체 설정 확인
+print("Loaded configuration:")
+print(OmegaConf.to_yaml(cfg))
 
-if not os.path.exists(OUTPUT_FOLDER):
-    os.makedirs(OUTPUT_FOLDER)
+# Device setup
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-def perform_ocr(image_path, output_path):
-    """입력 이미지에 대한 OCR 수행 후 결과를 TXT 파일에 저장"""
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Error: Could not read image {image_path}")
-        return
+# Step 1: Model Configuration
+model_cfg = cfg.get("trainer").get("model")
+if model_cfg is None:
+    print("Error: 'trainer.model' configuration is missing!")
+    exit(1)
 
-    # OCR 수행
-    ocr_results = get_text(
-        character='0123456789', imgH=image.shape[0], imgW=image.shape[1],
-        recognizer=recognizer, converter=converter,
-        image_list=[((0, 0), image)], device='cuda' if torch.cuda.is_available() else 'cpu'
-    )
+# 디버깅: 모델 설정 확인
+print("Model configuration details:")
+print(OmegaConf.to_yaml(model_cfg))
 
-    # 결과를 텍스트 파일에 저장
-    with open(output_path, 'w') as f:
-        for result in ocr_results:
-            text, confidence = result[1], result[2]
-            f.write(f"{text}\n")
+# Checkpoint 경로
+sam2_checkpoint = "/home/jovyan/SAM2_Para/sam2.1_hiera_large.pt"
 
-# 모든 이미지에 대해 OCR 수행
-for filename in os.listdir(INPUT_IMAGE_FOLDER):
-    if filename.endswith(('.jpg', '.png')):
-        image_path = os.path.join(INPUT_IMAGE_FOLDER, filename)
-        output_text_file = os.path.join(OUTPUT_FOLDER, f"{os.path.splitext(filename)[0]}.txt")
+# 모델 생성
+try:
+    print("Attempting to build the model...")
+    model = build_sam2(model_cfg, sam2_checkpoint, device=device)
+    print("Model built successfully!")
+except Exception as e:
+    print(f"Error building the model: {e}")
+    exit(1)
 
-        perform_ocr(image_path, output_text_file)
-        print(f"OCR 결과가 {output_text_file}에 저장되었습니다.")
+# Step 2: Dataset Preparation
+original_images_dir = "/home/jovyan/backup/FOR_YOLO/0_Testset_Mea"
+masked_images_dir = "/home/jovyan/backup/FOR_SAM/Train"
+output_model_path = "/home/jovyan/Project/STEP2/SAM/Train_Result/sam2_finetuned.pth"
+
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+])
+
+class PairedImageDataset(torch.utils.data.Dataset):
+    def __init__(self, original_dir, masked_dir, transform=None):
+        self.original_dir = original_dir
+        self.masked_dir = masked_dir
+        self.transform = transform
+        self.image_names = os.listdir(original_dir)
+    
+    def __len__(self):
+        return len(self.image_names)
+    
+    def __getitem__(self, idx):
+        orig_image_path = os.path.join(self.original_dir, self.image_names[idx])
+        mask_image_path = os.path.join(self.masked_dir, self.image_names[idx])
+        
+        orig_image = Image.open(orig_image_path).convert("RGB")
+        mask_image = Image.open(mask_image_path).convert("RGB")
+        
+        if self.transform:
+            orig_image = self.transform(orig_image)
+            mask_image = self.transform(mask_image)
+        
+        return orig_image, mask_image
+
+train_data = PairedImageDataset(original_images_dir, masked_images_dir, transform=transform)
+train_loader = torch.utils.data.DataLoader(train_data, batch_size=cfg.scratch.train_batch_size, shuffle=True)
+
+# Step 3: Training Setup
+criterion = nn.MSELoss()
+optimizer = optim.AdamW(model.parameters(), lr=cfg.scratch.base_lr, weight_decay=0.01)
+
+num_epochs = cfg.trainer.max_epochs if "max_epochs" in cfg.trainer else 1
+
+# Step 4: Fine-tune the Model
+model.train()
+for epoch in range(num_epochs):
+    running_loss = 0.0
+    for original, masked in tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+        original, masked = original.to(device), masked.to(device)
+        
+        optimizer.zero_grad()
+        outputs = model(original)
+        loss = criterion(outputs, masked)
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {running_loss/len(train_loader):.4f}")
+
+# Step 5: Save Fine-tuned Model
+torch.save(model.state_dict(), output_model_path)
+print("Fine-tuned model saved successfully!")
