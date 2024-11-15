@@ -1,3 +1,6 @@
+####### https://github.com/facebookresearch/sam2
+####### 위의 URL내 training-train.py 참고해서 만들었습니다
+
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # All rights reserved.
 
