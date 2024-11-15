@@ -9,6 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 from sam2.build_sam import build_sam2
 
+
 # Hydra 초기화 상태 확인 및 정리
 if GlobalHydra.instance().is_initialized():
     GlobalHydra.instance().clear()
