@@ -1,3 +1,5 @@
+###### 이건 직접 만들었습니다 ##########
+
 import torch
 from torch import nn, optim
 from torchvision import transforms
